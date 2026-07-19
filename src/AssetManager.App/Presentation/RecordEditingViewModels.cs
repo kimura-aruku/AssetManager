@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using AssetManager.Application.Search;
 using AssetManager.Domain.Catalog;
@@ -127,6 +128,8 @@ public sealed class FieldEditorViewModel : ObservableObject
     private DateTime? _selectedDate;
     private TargetPathKind _targetPathKind = TargetPathKind.File;
     private string? _warning;
+    private bool _isDirty;
+    private bool _isLoading;
 
     public FieldEditorViewModel(
         FieldDefinition definition,
@@ -135,6 +138,11 @@ public sealed class FieldEditorViewModel : ObservableObject
     {
         Definition = definition;
         Options = new ObservableCollection<SelectableOptionViewModel>(options ?? []);
+        foreach (var option in Options)
+        {
+            option.PropertyChanged += OnOptionPropertyChanged;
+        }
+
         Load(value);
     }
 
@@ -189,6 +197,7 @@ public sealed class FieldEditorViewModel : ObservableObject
         {
             if (SetProperty(ref _text, value))
             {
+                MarkDirty();
                 ValidatePreview();
             }
         }
@@ -197,31 +206,61 @@ public sealed class FieldEditorViewModel : ObservableObject
     public bool BooleanValue
     {
         get => _booleanValue;
-        set => SetProperty(ref _booleanValue, value);
+        set
+        {
+            if (SetProperty(ref _booleanValue, value))
+            {
+                MarkDirty();
+            }
+        }
     }
 
     public string? SelectedOptionId
     {
         get => _selectedOptionId;
-        set => SetProperty(ref _selectedOptionId, value);
+        set
+        {
+            if (SetProperty(ref _selectedOptionId, value))
+            {
+                MarkDirty();
+            }
+        }
     }
 
     public DateTime? SelectedDate
     {
         get => _selectedDate;
-        set => SetProperty(ref _selectedDate, value);
+        set
+        {
+            if (SetProperty(ref _selectedDate, value))
+            {
+                MarkDirty();
+            }
+        }
     }
 
     public TargetPathKind TargetPathKind
     {
         get => _targetPathKind;
-        set => SetProperty(ref _targetPathKind, value);
+        set
+        {
+            if (SetProperty(ref _targetPathKind, value))
+            {
+                MarkDirty();
+            }
+        }
     }
 
     public string? Warning
     {
         get => _warning;
         private set => SetProperty(ref _warning, value);
+    }
+
+    public bool IsDirty
+    {
+        get => _isDirty;
+        private set => SetProperty(ref _isDirty, value);
     }
 
     public FieldValue? CreateValue()
@@ -295,31 +334,56 @@ public sealed class FieldEditorViewModel : ObservableObject
 
     private void Load(FieldValue? value)
     {
-        Text = RecordValueFormatter.FormatForEditor(value);
-        BooleanValue = value is BooleanFieldValue { Value: true };
-        SelectedOptionId = value switch
+        _isLoading = true;
+        try
         {
-            SingleSelectionFieldValue single => single.Value.Value,
-            RecordStatusFieldValue status => status.Value.ToString().ToLowerInvariant(),
-            _ when Definition.Type == FieldType.RecordStatus => "unchecked",
-            _ => null,
-        };
-        SelectedDate = value is DateFieldValue date
-            ? date.Value.Value.ToDateTime(TimeOnly.MinValue)
-            : null;
-        TargetPathKind = value is TargetPathFieldValue target ? target.Kind : TargetPathKind.File;
+            Text = RecordValueFormatter.FormatForEditor(value);
+            BooleanValue = value is BooleanFieldValue { Value: true };
+            SelectedOptionId = value switch
+            {
+                SingleSelectionFieldValue single => single.Value.Value,
+                RecordStatusFieldValue status => status.Value.ToString().ToLowerInvariant(),
+                _ when Definition.Type == FieldType.RecordStatus => "unchecked",
+                _ => null,
+            };
+            SelectedDate = value is DateFieldValue date
+                ? date.Value.Value.ToDateTime(TimeOnly.MinValue)
+                : null;
+            TargetPathKind = value is TargetPathFieldValue target ? target.Kind : TargetPathKind.File;
 
-        var selectedIds = value switch
+            var selectedIds = value switch
+            {
+                MultiSelectionFieldValue multiple => multiple.Values.Select(id => id.Value),
+                AssetTypeSetFieldValue types => types.Values.Select(id => id.Value),
+                TagSetFieldValue tags => tags.Values.Select(id => id.Value),
+                _ => [],
+            };
+            var selectedSet = selectedIds.ToHashSet(StringComparer.Ordinal);
+            foreach (var option in Options)
+            {
+                option.IsSelected = selectedSet.Contains(option.Id);
+            }
+        }
+        finally
         {
-            MultiSelectionFieldValue multiple => multiple.Values.Select(id => id.Value),
-            AssetTypeSetFieldValue types => types.Values.Select(id => id.Value),
-            TagSetFieldValue tags => tags.Values.Select(id => id.Value),
-            _ => [],
-        };
-        var selectedSet = selectedIds.ToHashSet(StringComparer.Ordinal);
-        foreach (var option in Options)
+            _isLoading = false;
+            IsDirty = false;
+        }
+    }
+
+    private void OnOptionPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SelectableOptionViewModel.IsSelected))
         {
-            option.IsSelected = selectedSet.Contains(option.Id);
+            MarkDirty();
+        }
+    }
+
+    private void MarkDirty()
+    {
+        if (!_isLoading)
+        {
+            IsDirty = true;
         }
     }
 

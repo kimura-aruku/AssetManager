@@ -14,6 +14,8 @@
     <KeyBinding Key="Delete" Command="{Binding DeleteRecordCommand}" />
     <KeyBinding Key="Z" Modifiers="Ctrl" Command="{Binding UndoCommand}" />
     <KeyBinding Key="Y" Modifiers="Ctrl" Command="{Binding RedoCommand}" />
+    <KeyBinding Key="C" Modifiers="Ctrl" Command="{Binding CopySelectionCommand}" />
+    <KeyBinding Key="V" Modifiers="Ctrl" Command="{Binding PasteSelectionCommand}" />
     <KeyBinding Key="F5" Command="{Binding CheckAllPathsCommand}" />
   </Window.InputBindings>
 
@@ -48,6 +50,14 @@
                   Style="{StaticResource SecondaryButtonStyle}"
                   Command="{Binding RedoCommand}"
                   Content="やり直す" />
+          <Button Margin="8,0,0,0"
+                  Style="{StaticResource SecondaryButtonStyle}"
+                  Command="{Binding CopySelectionCommand}"
+                  Content="コピー" />
+          <Button Margin="4,0,0,0"
+                  Style="{StaticResource SecondaryButtonStyle}"
+                  Command="{Binding PasteSelectionCommand}"
+                  Content="貼り付け" />
         </StackPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
           <Button Style="{StaticResource SecondaryButtonStyle}"
@@ -178,7 +188,10 @@
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
                   SelectionMode="Extended"
-                  SelectionUnit="FullRow"
+                  SelectionUnit="CellOrRowHeader"
+                  SelectedCellsChanged="OnSelectedCellsChanged"
+                  PreviewMouseLeftButtonDown="OnGridPreviewMouseLeftButtonDown"
+                  CanUserSortColumns="False"
                   HeadersVisibility="All"
                   AlternationCount="2">
           <DataGrid.ContextMenu>
@@ -187,16 +200,19 @@
               <MenuItem Command="{Binding OpenTargetCommand}" Header="対象を開く" />
               <MenuItem Command="{Binding ShowTargetInExplorerCommand}" Header="Explorerで表示" />
               <Separator />
+              <MenuItem Command="{Binding CopySelectionCommand}" Header="選択セルをコピー" InputGestureText="Ctrl+C" />
+              <MenuItem Command="{Binding PasteSelectionCommand}" Header="選択セルへ貼り付け" InputGestureText="Ctrl+V" />
+              <Separator />
               <MenuItem Command="{Binding SaveRecordCommand}" Header="保存" InputGestureText="Ctrl+S" />
               <MenuItem Command="{Binding DeleteRecordCommand}" Header="管理レコードを削除" InputGestureText="Delete" />
             </ContextMenu>
           </DataGrid.ContextMenu>
           <DataGrid.Columns>
-            <DataGridTextColumn Width="2*" MinWidth="180" Header="パス" Binding="{Binding TargetPath}" />
-            <DataGridTextColumn Width="38" Header="★" Binding="{Binding FavoriteGlyph}" />
-            <DataGridTextColumn Width="1.3*" MinWidth="150" Header="素材名" Binding="{Binding Name}" />
-            <DataGridTextColumn Width="120" Header="種類" Binding="{Binding Types}" />
-            <DataGridTextColumn Width="1.4*" MinWidth="150" Header="ライセンス条件" Binding="{Binding License}" />
+            <DataGridTextColumn Width="2*" MinWidth="180" Header="パス" SortMemberPath="builtin.targetPath" Binding="{Binding TargetPath}" />
+            <DataGridTextColumn Width="38" Header="★" SortMemberPath="builtin.favorite" Binding="{Binding FavoriteGlyph}" />
+            <DataGridTextColumn Width="1.3*" MinWidth="150" Header="素材名" SortMemberPath="builtin.name" Binding="{Binding Name}" />
+            <DataGridTextColumn Width="120" Header="種類" SortMemberPath="builtin.assetTypes" Binding="{Binding Types}" />
+            <DataGridTextColumn Width="1.4*" MinWidth="150" Header="ライセンス条件" SortMemberPath="computed.licenseSummary" Binding="{Binding License}" />
           </DataGrid.Columns>
         </DataGrid>
         <Button Grid.Row="2"

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows.Input;
 using AssetManager.App.Composition;
 using AssetManager.Application.Data;
+using AssetManager.Application.GridEditing;
 using AssetManager.Application.Paths;
 using AssetManager.Application.Records;
 using AssetManager.Application.Search;
@@ -18,6 +19,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 {
     private readonly AppRuntimeServices _runtime;
     private readonly IUserDialogService _dialogs;
+    private readonly IClipboardService _clipboard;
     private readonly List<AssetRecord> _allRecords = [];
     private readonly Dictionary<FieldId, FieldDefinition> _definitions = [];
     private readonly Dictionary<AssetTypeId, string> _typeNames = [];
@@ -32,15 +34,19 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private bool _isCheckingPaths;
     private bool _isDraft;
     private int _totalMatchCount;
+    private IReadOnlyList<RecordRowViewModel> _selectedGridRows = [];
+    private IReadOnlyList<FieldId> _selectedGridFields = [];
 
     internal MainWindowViewModel(
         StartupResult startupResult,
         AppRuntimeServices runtime,
-        IUserDialogService dialogs)
+        IUserDialogService dialogs,
+        IClipboardService clipboard)
     {
         ArgumentNullException.ThrowIfNull(startupResult);
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
+        _clipboard = clipboard ?? throw new ArgumentNullException(nameof(clipboard));
         DataRoot = startupResult.DataRoot;
         StartupSummary = startupResult.CreatedInitialData
             ? "初期データを作成し、利用準備が整いました。"
@@ -56,6 +62,12 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync, () => SelectedRecord is not null);
         UndoCommand = new AsyncRelayCommand(UndoAsync, () => _runtime.UndoRedo.State.CanUndo);
         RedoCommand = new AsyncRelayCommand(RedoAsync, () => _runtime.UndoRedo.State.CanRedo);
+        CopySelectionCommand = new AsyncRelayCommand(
+            CopySelectionAsync,
+            () => _selectedGridRows.Count > 0 && _selectedGridFields.Count > 0);
+        PasteSelectionCommand = new AsyncRelayCommand(
+            PasteSelectionAsync,
+            () => _selectedGridRows.Count > 0 && _selectedGridFields.Count > 0);
         PickTargetFileCommand = new RelayCommand(() => PickTarget(isFolder: false));
         PickTargetFolderCommand = new RelayCommand(() => PickTarget(isFolder: true));
         OpenTargetCommand = new RelayCommand(OpenTarget, HasSelectedTarget);
@@ -128,7 +140,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public string EditorTitle => _isDraft
         ? "新しい素材"
-        : SelectedRecord?.Name ?? "素材を選択してください";
+        : _selectedGridRows.Count > 1
+            ? $"{_selectedGridRows.Count}件を一括編集"
+            : SelectedRecord?.Name ?? "素材を選択してください";
 
     public bool IsEditorVisible => _isDraft || SelectedRecord is not null;
 
@@ -163,6 +177,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     public ICommand UndoCommand { get; }
 
     public ICommand RedoCommand { get; }
+
+    public ICommand CopySelectionCommand { get; }
+
+    public ICommand PasteSelectionCommand { get; }
 
     public ICommand PickTargetFileCommand { get; }
 
@@ -224,6 +242,16 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     public IReadOnlyList<DisplayColumnOptionViewModel> GetVisibleDynamicColumns()
     {
         return DisplayColumns.Where(column => column.IsVisible).ToArray();
+    }
+
+    public void SetGridSelection(
+        IReadOnlyList<RecordRowViewModel> rows,
+        IReadOnlyList<FieldId> fields)
+    {
+        _selectedGridRows = rows ?? throw new ArgumentNullException(nameof(rows));
+        _selectedGridFields = fields ?? throw new ArgumentNullException(nameof(fields));
+        OnPropertyChanged(nameof(EditorTitle));
+        RelayCommand.RefreshCanExecute();
     }
 
     private async Task ReloadSnapshotAsync(CancellationToken cancellationToken = default)
@@ -401,6 +429,12 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     {
         try
         {
+            if (!_isDraft && _selectedGridRows.Count > 1)
+            {
+                await SaveSelectedRowsAsync();
+                return;
+            }
+
             var values = DetailFields.ToDictionary(
                 field => field.Definition.Id,
                 CreateEditorValue);
@@ -425,6 +459,68 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             _dialogs.ShowError($"レコードを保存できませんでした。{Environment.NewLine}{exception.Message}");
             StatusMessage = "保存に失敗しました。";
+        }
+    }
+
+    private async Task SaveSelectedRowsAsync()
+    {
+        var editedFields = DetailFields.Where(field => field.IsDirty).ToArray();
+        if (editedFields.Length == 0)
+        {
+            StatusMessage = "変更されたカラムはありません。";
+            return;
+        }
+
+        var changes = editedFields.ToDictionary(field => field.Definition.Id, CreateEditorValue);
+        var updates = GridBatchEditPlanner.CreateUniformUpdates(
+            _selectedGridRows.Select(row => row.Record.Id).ToArray(),
+            changes);
+        _ = await _runtime.Records.UpdateManyAsync(updates, "選択行を一括編集");
+        var count = updates.Count;
+        await ReloadSnapshotAsync();
+        SelectedRecord = null;
+        ApplySearch();
+        StatusMessage = $"{count}件のレコードへ変更したカラムを一括適用しました。";
+    }
+
+    private async Task CopySelectionAsync()
+    {
+        try
+        {
+            var text = await _runtime.GridClipboard.CopyAsync(
+                _selectedGridRows.Select(row => row.Record.Id).ToArray(),
+                _selectedGridFields);
+            _clipboard.SetText(text);
+            StatusMessage = $"{_selectedGridRows.Count}行 × {_selectedGridFields.Count}カラムをコピーしました。";
+        }
+        catch (Exception exception)
+        {
+            _dialogs.ShowError($"選択範囲をコピーできませんでした。{Environment.NewLine}{exception.Message}");
+        }
+    }
+
+    private async Task PasteSelectionAsync()
+    {
+        try
+        {
+            if (!_clipboard.ContainsText())
+            {
+                throw new GridClipboardException("クリップボードに貼り付け可能なテキストがありません。");
+            }
+
+            var count = _selectedGridRows.Count;
+            _ = await _runtime.GridClipboard.PasteAsync(
+                _clipboard.GetText(),
+                _selectedGridRows.Select(row => row.Record.Id).ToArray(),
+                _selectedGridFields);
+            await ReloadSnapshotAsync();
+            SelectedRecord = null;
+            ApplySearch();
+            StatusMessage = $"{count}件のレコードへ貼り付けました。";
+        }
+        catch (Exception exception)
+        {
+            _dialogs.ShowError($"選択範囲へ貼り付けできませんでした。{Environment.NewLine}{exception.Message}");
         }
     }
 

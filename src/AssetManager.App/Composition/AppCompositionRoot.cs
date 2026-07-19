@@ -3,6 +3,7 @@ using AssetManager.App.Windows;
 using AssetManager.Application.Catalog;
 using AssetManager.Application.Data;
 using AssetManager.Application.Fields;
+using AssetManager.Application.GridEditing;
 using AssetManager.Application.Records;
 using AssetManager.Application.Startup;
 using AssetManager.Application.History;
@@ -41,7 +42,11 @@ internal static class AppCompositionRoot
         AppRuntimeServices runtime)
     {
         var dialogs = new WpfUserDialogService();
-        var viewModel = new MainWindowViewModel(startupResult, runtime, dialogs);
+        var viewModel = new MainWindowViewModel(
+            startupResult,
+            runtime,
+            dialogs,
+            new WpfClipboardService());
 
         return new MainWindow
         {
@@ -60,10 +65,12 @@ internal static class AppCompositionRoot
             new FileUndoHistoryPersistence(layout));
         var fields = new FieldApplicationService(store, history: undoRedo);
         var catalog = new CatalogApplicationService(store);
+        var records = new RecordApplicationService(store, history: undoRedo);
         return new AppRuntimeServices(
             store,
             undoRedo,
-            new RecordApplicationService(store, history: undoRedo),
+            records,
+            new GridClipboardService(store, records),
             fields,
             catalog,
             new RecordPathCheckCoordinator(
@@ -96,6 +103,7 @@ internal sealed record AppRuntimeServices(
     IAssetManagerDataStore Store,
     UndoRedoService UndoRedo,
     RecordApplicationService Records,
+    GridClipboardService GridClipboard,
     FieldApplicationService Fields,
     CatalogApplicationService Catalog,
     RecordPathCheckCoordinator PathChecks,
