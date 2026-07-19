@@ -220,7 +220,9 @@ public sealed class FieldEditorViewModel : ObservableObject
 
     public bool IsAssetTypeSet => Definition.Type == FieldType.AssetTypeSet;
 
-    public bool IsOtherMultiOption => IsMultiOption && !IsAssetTypeSet;
+    public bool IsTagSet => Definition.Type == FieldType.TagSet;
+
+    public bool IsOtherMultiOption => IsMultiOption && !IsAssetTypeSet && !IsTagSet;
 
     public bool IsLicenseCondition => Definition.SystemRole is
         SystemRole.CreditRequired

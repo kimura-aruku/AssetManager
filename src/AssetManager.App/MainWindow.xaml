@@ -310,7 +310,7 @@
             </DataGridTemplateColumn>
             <DataGridTextColumn x:Name="LicenseLastCheckedColumn"
                                 Width="130"
-                                Header="ライセンス最終確認日"
+                                Header="最終確認日"
                                 SortMemberPath="builtin.licenseLastCheckedDate"
                                 Binding="{Binding LicenseLastCheckedDate}" />
           </DataGrid.Columns>
@@ -333,7 +333,8 @@
               BorderBrush="{DynamicResource BorderBrush}"
               BorderThickness="1,0,0,0">
         <DockPanel>
-          <StackPanel DockPanel.Dock="Top">
+          <StackPanel DockPanel.Dock="Top"
+                      Visibility="{Binding IsEditorVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
             <DockPanel>
               <TextBlock VerticalAlignment="Center"
                          FontSize="17"
@@ -414,6 +415,21 @@
                       <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                           <UniformGrid Columns="3" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <CheckBox Margin="0,2,8,2"
+                                    Content="{Binding Label}"
+                                    IsChecked="{Binding IsSelected}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl Visibility="{Binding IsTagSet, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                  ItemsSource="{Binding Options}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <UniformGrid Columns="2" />
                         </ItemsPanelTemplate>
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>

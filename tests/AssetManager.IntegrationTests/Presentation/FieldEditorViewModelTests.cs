@@ -113,9 +113,11 @@ public sealed class FieldEditorViewModelTests
         var tagEditor = new FieldEditorViewModel(tagDefinition, value: null);
 
         Assert.True(typeEditor.IsAssetTypeSet);
+        Assert.False(typeEditor.IsTagSet);
         Assert.False(typeEditor.IsOtherMultiOption);
         Assert.False(tagEditor.IsAssetTypeSet);
-        Assert.True(tagEditor.IsOtherMultiOption);
+        Assert.True(tagEditor.IsTagSet);
+        Assert.False(tagEditor.IsOtherMultiOption);
     }
 
     [Fact]
