@@ -57,7 +57,7 @@ public sealed class RecordRepository(AtomicJsonFileStore store)
         ArgumentNullException.ThrowIfNull(layout);
         ArgumentNullException.ThrowIfNull(persistedRecord);
         var path = GetRecordPath(layout, persistedRecord.Record.Id);
-        var document = ToDocument(persistedRecord);
+        var document = CreateDocument(persistedRecord);
         await store.SaveAsync(path, document, ValidateDocument, cancellationToken).ConfigureAwait(false);
     }
 
@@ -191,7 +191,7 @@ public sealed class RecordRepository(AtomicJsonFileStore store)
         return Path.Combine(layout.RecordsDirectory, $"{id}.json");
     }
 
-    private static RecordDocument ToDocument(PersistedAssetRecord persisted)
+    public static RecordDocument CreateDocument(PersistedAssetRecord persisted)
     {
         var values = persisted.UnknownValues.ToDictionary(
             pair => pair.Key.Value,

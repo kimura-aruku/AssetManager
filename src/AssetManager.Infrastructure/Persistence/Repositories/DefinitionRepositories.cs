@@ -33,10 +33,17 @@ public sealed class FieldDefinitionRepository(AtomicJsonFileStore store)
         IEnumerable<FieldDefinition> definitions,
         CancellationToken cancellationToken = default)
     {
-        var document = new FieldDefinitionsDocument(
+        var document = CreateDocument(definitions);
+        return store.SaveAsync(layout.FieldsFile, document, ValidateDocument, cancellationToken);
+    }
+
+    public static FieldDefinitionsDocument CreateDocument(
+        IEnumerable<FieldDefinition> definitions)
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        return new FieldDefinitionsDocument(
             JsonDefaults.CurrentSchemaVersion,
             definitions.Select(ToDocument).ToArray());
-        return store.SaveAsync(layout.FieldsFile, document, ValidateDocument, cancellationToken);
     }
 
     private static void ValidateDocument(FieldDefinitionsDocument document)
