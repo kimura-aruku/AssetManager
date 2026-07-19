@@ -67,6 +67,8 @@ internal static class AppCompositionRoot
         var fields = new FieldApplicationService(store, history: undoRedo);
         var catalog = new CatalogApplicationService(store);
         var records = new RecordApplicationService(store, history: undoRedo);
+        var settings = new AppSettingsService(new JsonAppSettingsStore(layout));
+        var dataRootMigration = new DataRootMigrationService(AppDataPaths.CreateDefault());
         return new AppRuntimeServices(
             store,
             undoRedo,
@@ -80,7 +82,7 @@ internal static class AppCompositionRoot
             new PathRegistrationService(fileSystem, new WpfWindowsPathPicker()),
             new WindowsShellService(),
             new SearchConfigurationService(new JsonViewConfigurationStore(layout)),
-            new AppSettingsService(new JsonAppSettingsStore(layout)),
+            settings,
             () =>
             {
                 var window = new ManagementWindow
@@ -90,6 +92,22 @@ internal static class AppCompositionRoot
                         fields,
                         catalog,
                         new WpfUserDialogService()),
+                    Owner = System.Windows.Application.Current.MainWindow,
+                };
+                _ = window.ShowDialog();
+            },
+            () =>
+            {
+                var picker = new WpfWindowsPathPicker();
+                var window = new SettingsWindow
+                {
+                    DataContext = new SettingsWindowViewModel(
+                        settings,
+                        dataRootMigration,
+                        startupResult.DataRoot,
+                        () => picker.PickFolder("空のデータ保存先フォルダーを選択"),
+                        new WpfUserDialogService(),
+                        () => System.Windows.Application.Current.Shutdown()),
                     Owner = System.Windows.Application.Current.MainWindow,
                 };
                 _ = window.ShowDialog();
@@ -113,4 +131,5 @@ internal sealed record AppRuntimeServices(
     IWindowsShellService Shell,
     SearchConfigurationService SearchConfiguration,
     AppSettingsService Settings,
-    Action ShowManagementWindow);
+    Action ShowManagementWindow,
+    Action ShowSettingsWindow);

@@ -76,6 +76,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         OpenTargetCommand = new RelayCommand(OpenTarget, HasSelectedTarget);
         ShowTargetInExplorerCommand = new RelayCommand(ShowTargetInExplorer, HasSelectedTarget);
         ShowManagementCommand = new AsyncRelayCommand(ShowManagementAsync);
+        ShowSettingsCommand = new RelayCommand(_runtime.ShowSettingsWindow);
         SaveSearchCommand = new AsyncRelayCommand(SaveSearchAsync, () => !string.IsNullOrWhiteSpace(SavedSearchName));
         LoadSavedSearchCommand = new RelayCommand(LoadSavedSearch, () => SelectedSavedSearch is not null);
         DeleteSavedSearchCommand = new AsyncRelayCommand(DeleteSavedSearchAsync, () => SelectedSavedSearch is not null);
@@ -194,6 +195,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     public ICommand ShowTargetInExplorerCommand { get; }
 
     public ICommand ShowManagementCommand { get; }
+
+    public ICommand ShowSettingsCommand { get; }
 
     public ICommand SaveSearchCommand { get; }
 

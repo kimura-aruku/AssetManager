@@ -72,6 +72,10 @@
                   Style="{StaticResource SecondaryButtonStyle}"
                   Command="{Binding ShowManagementCommand}"
                   Content="カラム・分類管理" />
+          <Button Margin="4,0,0,0"
+                  Style="{StaticResource SecondaryButtonStyle}"
+                  Command="{Binding ShowSettingsCommand}"
+                  Content="設定" />
         </StackPanel>
       </DockPanel>
     </Border>
