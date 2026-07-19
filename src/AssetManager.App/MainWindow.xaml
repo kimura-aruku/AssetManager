@@ -33,13 +33,17 @@
                   VerticalAlignment="Center">
         <TextBlock HorizontalAlignment="Center"
                    Style="{StaticResource HeadingTextStyle}"
-                   Text="プロジェクト基盤の準備が完了しました" />
+                   Text="{Binding StartupSummary}" />
         <TextBlock Margin="0,12,0,20"
                    HorizontalAlignment="Center"
                    Style="{StaticResource BodyTextStyle}"
-                   Text="次の実装で、素材レコードと動的カラムのドメインモデルを追加します。"
+                   Text="{Binding DataRoot, StringFormat=データ保存先: {0}}"
                    TextAlignment="Center"
                    TextWrapping="Wrap" />
+        <TextBlock Margin="0,0,0,20"
+                   HorizontalAlignment="Center"
+                   Style="{StaticResource BodyTextStyle}"
+                   Text="{Binding RecordCount, StringFormat=登録素材: {0} 件}" />
         <Button HorizontalAlignment="Center"
                 Command="{Binding ConfirmEnvironmentCommand}"
                 Content="準備状態を確認" />
