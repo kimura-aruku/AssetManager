@@ -17,6 +17,7 @@ public sealed class ManagementWindowViewModel : ObservableObject
     private readonly IUserDialogService _dialogs;
     private FieldDefinition? _selectedField;
     private AssetTypeDefinition? _selectedAssetType;
+    private SelectionOption? _selectedAcquisitionSource;
     private TagCategoryDefinition? _selectedCategory;
     private TagDefinition? _selectedTag;
     private string _fieldName = string.Empty;
@@ -26,6 +27,7 @@ public sealed class ManagementWindowViewModel : ObservableObject
     private bool _fieldDetailVisible = true;
     private string _assetTypeName = string.Empty;
     private string _assetTypeExtensions = string.Empty;
+    private string _acquisitionSourceName = string.Empty;
     private string _categoryName = string.Empty;
     private string _tagName = string.Empty;
     private string _tagColor = "#4F7CAC";
@@ -48,6 +50,13 @@ public sealed class ManagementWindowViewModel : ObservableObject
         SaveAssetTypeCommand = new AsyncRelayCommand(SaveAssetTypeAsync, () => !string.IsNullOrWhiteSpace(AssetTypeName));
         NewAssetTypeCommand = new RelayCommand(ClearAssetTypeForm);
         DeleteAssetTypeCommand = new AsyncRelayCommand(DeleteAssetTypeAsync, () => SelectedAssetType is not null);
+        SaveAcquisitionSourceCommand = new AsyncRelayCommand(
+            SaveAcquisitionSourceAsync,
+            () => !string.IsNullOrWhiteSpace(AcquisitionSourceName));
+        NewAcquisitionSourceCommand = new RelayCommand(ClearAcquisitionSourceForm);
+        DeleteAcquisitionSourceCommand = new AsyncRelayCommand(
+            DeleteAcquisitionSourceAsync,
+            () => SelectedAcquisitionSource is not null);
         SaveCategoryCommand = new AsyncRelayCommand(SaveCategoryAsync, () => !string.IsNullOrWhiteSpace(CategoryName));
         NewCategoryCommand = new RelayCommand(ClearCategoryForm);
         DeleteCategoryCommand = new AsyncRelayCommand(DeleteCategoryAsync, () => SelectedCategory is not null);
@@ -60,6 +69,8 @@ public sealed class ManagementWindowViewModel : ObservableObject
     public ObservableCollection<FieldDefinition> CustomFields { get; } = [];
 
     public ObservableCollection<AssetTypeDefinition> AssetTypes { get; } = [];
+
+    public ObservableCollection<SelectionOption> AcquisitionSources { get; } = [];
 
     public ObservableCollection<TagCategoryDefinition> Categories { get; } = [];
 
@@ -105,6 +116,19 @@ public sealed class ManagementWindowViewModel : ObservableObject
             {
                 AssetTypeName = value.Name;
                 AssetTypeExtensions = string.Join(", ", value.Extensions);
+                RelayCommand.RefreshCanExecute();
+            }
+        }
+    }
+
+    public SelectionOption? SelectedAcquisitionSource
+    {
+        get => _selectedAcquisitionSource;
+        set
+        {
+            if (SetProperty(ref _selectedAcquisitionSource, value) && value is not null)
+            {
+                AcquisitionSourceName = value.Label;
                 RelayCommand.RefreshCanExecute();
             }
         }
@@ -180,6 +204,12 @@ public sealed class ManagementWindowViewModel : ObservableObject
         set => SetProperty(ref _assetTypeExtensions, value);
     }
 
+    public string AcquisitionSourceName
+    {
+        get => _acquisitionSourceName;
+        set { if (SetProperty(ref _acquisitionSourceName, value)) RelayCommand.RefreshCanExecute(); }
+    }
+
     public string CategoryName
     {
         get => _categoryName;
@@ -210,6 +240,9 @@ public sealed class ManagementWindowViewModel : ObservableObject
     public ICommand SaveAssetTypeCommand { get; }
     public ICommand NewAssetTypeCommand { get; }
     public ICommand DeleteAssetTypeCommand { get; }
+    public ICommand SaveAcquisitionSourceCommand { get; }
+    public ICommand NewAcquisitionSourceCommand { get; }
+    public ICommand DeleteAcquisitionSourceCommand { get; }
     public ICommand SaveCategoryCommand { get; }
     public ICommand NewCategoryCommand { get; }
     public ICommand DeleteCategoryCommand { get; }
@@ -234,6 +267,11 @@ public sealed class ManagementWindowViewModel : ObservableObject
         var snapshot = await _store.LoadAsync();
         Replace(CustomFields, snapshot.FieldDefinitions.Where(field => field.Origin == FieldOrigin.Custom));
         Replace(AssetTypes, snapshot.AssetTypes);
+        Replace(
+            AcquisitionSources,
+            snapshot.FieldDefinitions
+                .Single(field => field.Id == BuiltInFieldIds.AcquisitionSource)
+                .Options);
         Replace(Categories, snapshot.TagCategories);
         Replace(Tags, snapshot.Tags);
     }
@@ -327,6 +365,51 @@ public sealed class ManagementWindowViewModel : ObservableObject
         catch (Exception exception)
         {
             _dialogs.ShowError($"種類を保存できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
+        }
+    }
+
+    private async Task SaveAcquisitionSourceAsync()
+    {
+        try
+        {
+            _ = SelectedAcquisitionSource is null
+                ? await _catalog.AddAcquisitionSourceAsync(AcquisitionSourceName)
+                : await _catalog.UpdateAcquisitionSourceAsync(
+                    SelectedAcquisitionSource.Id,
+                    AcquisitionSourceName);
+            await ReloadAsync();
+            ClearAcquisitionSourceForm();
+        }
+        catch (Exception exception)
+        {
+            _dialogs.ShowError(
+                $"購入／入手元を保存できませんでした。{Environment.NewLine}{exception.Message}",
+                exception: exception);
+        }
+    }
+
+    private async Task DeleteAcquisitionSourceAsync()
+    {
+        var selected = SelectedAcquisitionSource;
+        if (selected is null
+            || !_dialogs.Confirm(
+                $"購入／入手元「{selected.Label}」を削除しますか？",
+                "AssetManager - 購入／入手元削除"))
+        {
+            return;
+        }
+
+        try
+        {
+            await _catalog.DeleteAcquisitionSourceAsync(selected.Id);
+            await ReloadAsync();
+            ClearAcquisitionSourceForm();
+        }
+        catch (Exception exception)
+        {
+            _dialogs.ShowError(
+                $"購入／入手元を削除できませんでした。{Environment.NewLine}{exception.Message}",
+                exception: exception);
         }
     }
 
@@ -456,6 +539,12 @@ public sealed class ManagementWindowViewModel : ObservableObject
         SelectedAssetType = null;
         AssetTypeName = string.Empty;
         AssetTypeExtensions = string.Empty;
+    }
+
+    private void ClearAcquisitionSourceForm()
+    {
+        SelectedAcquisitionSource = null;
+        AcquisitionSourceName = string.Empty;
     }
 
     private void ClearCategoryForm()

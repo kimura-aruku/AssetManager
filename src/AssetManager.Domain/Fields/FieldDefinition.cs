@@ -180,6 +180,17 @@ public sealed class FieldDefinition
         return Copy(mainTableVisible: mainTableVisible, detailVisible: detailVisible);
     }
 
+    public FieldDefinition SetSelectionOptions(IEnumerable<SelectionOption> options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (Type is not FieldType.SingleSelect and not FieldType.MultiSelect)
+        {
+            throw new DomainValidationException("選択型カラム以外には選択肢を設定できません。", nameof(options));
+        }
+
+        return Copy(options: options);
+    }
+
     private FieldDefinition Copy(
         string? label = null,
         FieldType? type = null,

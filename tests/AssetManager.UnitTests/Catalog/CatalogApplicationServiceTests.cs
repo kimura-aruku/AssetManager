@@ -52,6 +52,49 @@ public sealed class CatalogApplicationServiceTests
     }
 
     [Fact]
+    public async Task AcquisitionSourceCanBeAddedUpdatedAndDeleted()
+    {
+        var store = CreateStore();
+        var service = new CatalogApplicationService(store);
+
+        var added = await service.AddAcquisitionSourceAsync("BOOTH");
+        var updated = await service.UpdateAcquisitionSourceAsync(added.Id, "BOOTHショップ");
+
+        Assert.Equal("BOOTHショップ", updated.Label);
+        var definition = store.Snapshot.FieldDefinitions.Single(
+            field => field.Id == BuiltInFieldIds.AcquisitionSource);
+        Assert.Equal(updated, Assert.Single(definition.Options));
+        await service.DeleteAcquisitionSourceAsync(added.Id);
+        Assert.Empty(store.Snapshot.FieldDefinitions.Single(
+            field => field.Id == BuiltInFieldIds.AcquisitionSource).Options);
+    }
+
+    [Fact]
+    public async Task UsedAcquisitionSourceCannotBeDeleted()
+    {
+        var source = new SelectionOption(new SelectionOptionId("acquisition-source.booth"), "BOOTH");
+        var definitions = BuiltInFieldCatalog.All.Select(field =>
+            field.Id == BuiltInFieldIds.AcquisitionSource
+                ? field.SetSelectionOptions([source])
+                : field).ToArray();
+        var sourceDefinition = definitions.Single(field => field.Id == BuiltInFieldIds.AcquisitionSource);
+        var record = AssetRecord.Create(TestTime).SetValue(
+            sourceDefinition,
+            new SingleSelectionFieldValue(source.Id),
+            TestTime);
+        var store = new TestDataStore(new AssetManagerDataSnapshot(
+            definitions,
+            [],
+            [],
+            [],
+            [record]));
+        var service = new CatalogApplicationService(store);
+
+        _ = await Assert.ThrowsAsync<CatalogItemInUseException>(
+            () => service.DeleteAcquisitionSourceAsync(source.Id));
+    }
+
+    [Fact]
     public async Task TagCategoryAndTagCanBeAddedEditedAndDeleted()
     {
         var store = CreateStore();

@@ -71,7 +71,7 @@
           <Button Margin="8,0,0,0"
                   Style="{StaticResource SecondaryButtonStyle}"
                   Command="{Binding ShowManagementCommand}"
-                  Content="カラム・分類管理" />
+                  Content="カラム・マスタ管理" />
           <Button Margin="4,0,0,0"
                   Style="{StaticResource SecondaryButtonStyle}"
                   Command="{Binding ShowSettingsCommand}"

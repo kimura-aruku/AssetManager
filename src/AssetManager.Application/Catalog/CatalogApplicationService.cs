@@ -13,6 +13,69 @@ public sealed class CatalogApplicationService(IAssetManagerDataStore store)
 {
     private readonly IAssetManagerDataStore _store = store ?? throw new ArgumentNullException(nameof(store));
 
+    public async Task<SelectionOption> AddAcquisitionSourceAsync(
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var normalizedName = name.Trim();
+        var snapshot = await _store.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var definition = GetAcquisitionSourceDefinition(snapshot.FieldDefinitions);
+        EnsureUniqueAcquisitionSourceName(definition.Options, normalizedName);
+        var option = new SelectionOption(
+            new SelectionOptionId($"acquisition-source.{Guid.CreateVersion7():D}"),
+            normalizedName);
+        await SaveAcquisitionSourceDefinitionAsync(
+            snapshot.FieldDefinitions,
+            definition.SetSelectionOptions(definition.Options.Append(option)),
+            cancellationToken).ConfigureAwait(false);
+        return option;
+    }
+
+    public async Task<SelectionOption> UpdateAcquisitionSourceAsync(
+        SelectionOptionId id,
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var normalizedName = name.Trim();
+        var snapshot = await _store.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var definition = GetAcquisitionSourceDefinition(snapshot.FieldDefinitions);
+        var current = definition.Options.FirstOrDefault(option => option.Id == id)
+            ?? throw new KeyNotFoundException($"購入／入手元'{id}'が見つかりません。");
+        EnsureUniqueAcquisitionSourceName(definition.Options, normalizedName, id);
+        var updated = new SelectionOption(current.Id, normalizedName);
+        await SaveAcquisitionSourceDefinitionAsync(
+            snapshot.FieldDefinitions,
+            definition.SetSelectionOptions(
+                definition.Options.Select(option => option.Id == id ? updated : option)),
+            cancellationToken).ConfigureAwait(false);
+        return updated;
+    }
+
+    public async Task DeleteAcquisitionSourceAsync(
+        SelectionOptionId id,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _store.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var definition = GetAcquisitionSourceDefinition(snapshot.FieldDefinitions);
+        if (definition.Options.All(option => option.Id != id))
+        {
+            throw new KeyNotFoundException($"購入／入手元'{id}'が見つかりません。");
+        }
+
+        if (snapshot.Records.Any(record =>
+                record.GetValue<SingleSelectionFieldValue>(BuiltInFieldIds.AcquisitionSource)?.Value == id))
+        {
+            throw new CatalogItemInUseException("レコードで使用中の購入／入手元は削除できません。");
+        }
+
+        await SaveAcquisitionSourceDefinitionAsync(
+            snapshot.FieldDefinitions,
+            definition.SetSelectionOptions(definition.Options.Where(option => option.Id != id)),
+            cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<AssetTypeDefinition> AddAssetTypeAsync(
         string name,
         IEnumerable<string>? extensions = null,
@@ -200,5 +263,41 @@ public sealed class CatalogApplicationService(IAssetManagerDataStore store)
         {
             throw new KeyNotFoundException($"タグ'{id}'が見つかりません。");
         }
+    }
+
+    private static FieldDefinition GetAcquisitionSourceDefinition(
+        IReadOnlyList<FieldDefinition> definitions)
+    {
+        var definition = definitions.FirstOrDefault(
+            field => field.Id == BuiltInFieldIds.AcquisitionSource)
+            ?? throw new KeyNotFoundException("購入／入手元カラムが見つかりません。");
+        if (definition.Type != FieldType.SingleSelect)
+        {
+            throw new DomainValidationException("購入／入手元カラムのデータ移行が完了していません。");
+        }
+
+        return definition;
+    }
+
+    private static void EnsureUniqueAcquisitionSourceName(
+        IEnumerable<SelectionOption> options,
+        string name,
+        SelectionOptionId? exceptId = null)
+    {
+        if (options.Any(option => option.Id != exceptId
+                && string.Equals(option.Label, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new DomainValidationException($"購入／入手元'{name}'は既に登録されています。", nameof(name));
+        }
+    }
+
+    private Task SaveAcquisitionSourceDefinitionAsync(
+        IReadOnlyList<FieldDefinition> definitions,
+        FieldDefinition updated,
+        CancellationToken cancellationToken)
+    {
+        return _store.SaveFieldDefinitionsAsync(
+            definitions.Select(definition => definition.Id == updated.Id ? updated : definition).ToArray(),
+            cancellationToken);
     }
 }

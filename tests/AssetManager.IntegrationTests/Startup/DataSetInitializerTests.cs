@@ -7,6 +7,8 @@ using AssetManager.Infrastructure.Persistence.Repositories;
 using AssetManager.Infrastructure.Startup;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
+using AssetManager.Domain.Records;
+using AssetManager.Domain.Values;
 using System.Text.Json;
 
 namespace AssetManager.IntegrationTests.Startup;
@@ -103,6 +105,53 @@ public sealed class DataSetInitializerTests
         var excluded = Assert.Single(result.ExcludedRecords);
         Assert.Equal(excludedPath, excluded.Path);
         Assert.NotEmpty(excluded.Error);
+    }
+
+    [Fact]
+    public async Task RestartMigratesFreeTextAcquisitionSourcesToSelectionMaster()
+    {
+        using var temporary = new TemporaryDirectory();
+        var paths = new AppDataPaths(temporary.Path);
+        var initializer = new DataSetInitializer(paths);
+        var firstResult = await initializer.InitializeAsync();
+        var layout = new DataRootLayout(firstResult.DataRoot);
+        var fileStore = new AtomicJsonFileStore();
+        var current = BuiltInFieldCatalog.All.Single(
+            definition => definition.Id == BuiltInFieldIds.AcquisitionSource);
+        var legacy = FieldDefinition.CreateBuiltIn(
+            current.Id,
+            current.Label,
+            FieldType.Text,
+            current.SystemRole!.Value,
+            current.MainTableVisible,
+            current.MainTableRequired,
+            current.DetailVisible,
+            current.UserCanHide);
+        var legacyDefinitions = BuiltInFieldCatalog.All.Select(definition =>
+            definition.Id == legacy.Id ? legacy : definition).ToArray();
+        await new FieldDefinitionRepository(fileStore).SaveAsync(layout, legacyDefinitions);
+        var now = DateTimeOffset.UtcNow;
+        var record = AssetRecord.Create(now).SetValue(
+            legacy,
+            new TextFieldValue("BOOTH"),
+            now);
+        await new RecordRepository(fileStore).SaveAsync(layout, new PersistedAssetRecord(record));
+
+        _ = await initializer.InitializeAsync();
+
+        var definitions = await new FieldDefinitionRepository(fileStore).LoadAsync(layout);
+        var migratedDefinition = definitions.Single(
+            definition => definition.Id == BuiltInFieldIds.AcquisitionSource);
+        var source = Assert.Single(migratedDefinition.Options);
+        Assert.Equal(FieldType.SingleSelect, migratedDefinition.Type);
+        Assert.Equal("BOOTH", source.Label);
+        var loaded = await new RecordRepository(fileStore).LoadAsync(
+            layout,
+            RecordRepository.GetRecordPath(layout, record.Id),
+            definitions);
+        Assert.Equal(
+            source.Id,
+            loaded.Record.Record.GetValue<SingleSelectionFieldValue>(BuiltInFieldIds.AcquisitionSource)?.Value);
     }
 
     private sealed class CollectingProgress : IProgress<StartupProgress>

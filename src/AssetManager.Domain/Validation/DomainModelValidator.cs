@@ -97,14 +97,8 @@ public static class DomainModelValidator
         foreach (var definition in copied.Where(definition => definition.Origin == FieldOrigin.BuiltIn))
         {
             if (!canonicalDefinitions.TryGetValue(definition.Id, out var canonical)
-                || definition.Label != canonical.Label
-                || definition.Type != canonical.Type
-                || definition.SystemRole != canonical.SystemRole
-                || definition.MainTableRequired != canonical.MainTableRequired
-                || definition.UserCanHide != canonical.UserCanHide
-                || definition.UserCanRename != canonical.UserCanRename
-                || definition.UserCanChangeType != canonical.UserCanChangeType
-                || definition.UserCanDelete != canonical.UserCanDelete)
+                || (!HasCanonicalFixedDefinition(definition, canonical)
+                    && !IsLegacyAcquisitionSourceDefinition(definition, canonical)))
             {
                 issues.Add(new ValidationIssue(
                     ValidationIssueCode.InvalidBuiltInFieldDefinition,
@@ -114,6 +108,36 @@ public static class DomainModelValidator
         }
 
         return issues;
+    }
+
+    private static bool HasCanonicalFixedDefinition(
+        FieldDefinition definition,
+        FieldDefinition canonical)
+    {
+        return definition.Label == canonical.Label
+            && definition.Type == canonical.Type
+            && definition.SystemRole == canonical.SystemRole
+            && definition.MainTableRequired == canonical.MainTableRequired
+            && definition.UserCanHide == canonical.UserCanHide
+            && definition.UserCanRename == canonical.UserCanRename
+            && definition.UserCanChangeType == canonical.UserCanChangeType
+            && definition.UserCanDelete == canonical.UserCanDelete;
+    }
+
+    private static bool IsLegacyAcquisitionSourceDefinition(
+        FieldDefinition definition,
+        FieldDefinition canonical)
+    {
+        return definition.Id == BuiltInFieldIds.AcquisitionSource
+            && definition.Type == FieldType.Text
+            && canonical.Type == FieldType.SingleSelect
+            && definition.Label == canonical.Label
+            && definition.SystemRole == canonical.SystemRole
+            && definition.MainTableRequired == canonical.MainTableRequired
+            && definition.UserCanHide == canonical.UserCanHide
+            && definition.UserCanRename == canonical.UserCanRename
+            && definition.UserCanChangeType == canonical.UserCanChangeType
+            && definition.UserCanDelete == canonical.UserCanDelete;
     }
 
     public static AssetRecordValidationResult ValidateRecord(

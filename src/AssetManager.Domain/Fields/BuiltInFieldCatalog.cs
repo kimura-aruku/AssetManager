@@ -22,7 +22,7 @@ public static class BuiltInFieldCatalog
             BuiltIn(BuiltInFieldIds.AssetUpdatedDate, "素材最終更新日", FieldType.Date, SystemRole.AssetUpdatedDate),
             BuiltIn(BuiltInFieldIds.Creators, "制作者", FieldType.StringList, SystemRole.Creators),
             BuiltIn(BuiltInFieldIds.Sellers, "販売者", FieldType.StringList, SystemRole.Sellers),
-            BuiltIn(BuiltInFieldIds.AcquisitionSource, "購入／入手元", FieldType.Text, SystemRole.AcquisitionSource),
+            BuiltIn(BuiltInFieldIds.AcquisitionSource, "購入／入手元", FieldType.SingleSelect, SystemRole.AcquisitionSource),
             BuiltIn(BuiltInFieldIds.ProductUrl, "商品URL", FieldType.Url, SystemRole.ProductUrl),
             BuiltIn(BuiltInFieldIds.AcquiredDate, "購入／入手日", FieldType.Date, SystemRole.AcquiredDate),
             BuiltIn(BuiltInFieldIds.PriceJpy, "購入価格（日本円）", FieldType.Number, SystemRole.PriceJpy),
