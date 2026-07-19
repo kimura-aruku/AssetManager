@@ -7,9 +7,8 @@ namespace AssetManager.Infrastructure.Windows;
 [SupportedOSPlatform("windows")]
 public sealed class SingleInstanceCoordinator : IDisposable
 {
-    private readonly Semaphore _semaphore;
+    private readonly Mutex _instanceMarker;
     private readonly EventWaitHandle _activationEvent;
-    private readonly bool _ownsSemaphore;
     private bool _disposed;
 
     public SingleInstanceCoordinator(string applicationId)
@@ -20,12 +19,11 @@ public sealed class SingleInstanceCoordinator : IDisposable
             false,
             EventResetMode.AutoReset,
             $"Local\\{scope}.Activate");
-        _semaphore = new Semaphore(
-            initialCount: 1,
-            maximumCount: 1,
-            $"Local\\{scope}.Semaphore");
-        _ownsSemaphore = _semaphore.WaitOne(TimeSpan.Zero);
-        IsPrimary = _ownsSemaphore;
+        _instanceMarker = new Mutex(
+            initiallyOwned: false,
+            $"Local\\{scope}.Instance",
+            out var createdNew);
+        IsPrimary = createdNew;
         if (!IsPrimary)
         {
             _ = _activationEvent.Set();
@@ -56,12 +54,7 @@ public sealed class SingleInstanceCoordinator : IDisposable
             return;
         }
 
-        if (_ownsSemaphore)
-        {
-            _semaphore.Release();
-        }
-
-        _semaphore.Dispose();
+        _instanceMarker.Dispose();
         _activationEvent.Dispose();
         _disposed = true;
     }
