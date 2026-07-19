@@ -41,7 +41,7 @@ public sealed class SearchFieldViewModel : ObservableObject
 
     public FieldDefinition Definition { get; }
 
-    public string Label => Definition.Label;
+    public string Label => Definition.Id == BuiltInFieldIds.TargetPath ? "パス" : Definition.Label;
 
     public ObservableCollection<SelectableOptionViewModel> Options { get; }
 
@@ -124,6 +124,7 @@ public sealed class FieldEditorViewModel : ObservableObject
     private string _text = string.Empty;
     private bool _booleanValue;
     private string? _selectedOptionId;
+    private DateTime? _selectedDate;
     private TargetPathKind _targetPathKind = TargetPathKind.File;
     private string? _warning;
 
@@ -139,7 +140,7 @@ public sealed class FieldEditorViewModel : ObservableObject
 
     public FieldDefinition Definition { get; }
 
-    public string Label => Definition.Label;
+    public string Label => Definition.Id == BuiltInFieldIds.TargetPath ? "パス" : Definition.Label;
 
     public string? Hint => Definition.Type switch
     {
@@ -162,7 +163,19 @@ public sealed class FieldEditorViewModel : ObservableObject
 
     public bool IsTargetPath => Definition.Type == FieldType.TargetPath;
 
-    public bool IsText => !IsBoolean && !IsSingleOption && !IsMultiOption;
+    public bool IsDate => Definition.Type == FieldType.Date;
+
+    public bool IsNumber => Definition.Type == FieldType.Number;
+
+    public bool IsCurrency => Definition.SystemRole == SystemRole.PriceJpy;
+
+    public string? NumberSuffix => IsCurrency ? "円" : null;
+
+    public bool IsText => !IsBoolean
+        && !IsSingleOption
+        && !IsMultiOption
+        && !IsDate
+        && !IsNumber;
 
     public bool AcceptsMultipleLines => Definition.Type is FieldType.MultilineText
         or FieldType.StringList
@@ -191,6 +204,12 @@ public sealed class FieldEditorViewModel : ObservableObject
     {
         get => _selectedOptionId;
         set => SetProperty(ref _selectedOptionId, value);
+    }
+
+    public DateTime? SelectedDate
+    {
+        get => _selectedDate;
+        set => SetProperty(ref _selectedDate, value);
     }
 
     public TargetPathKind TargetPathKind
@@ -241,6 +260,13 @@ public sealed class FieldEditorViewModel : ObservableObject
             };
         }
 
+        if (IsDate)
+        {
+            return SelectedDate is null
+                ? null
+                : new DateFieldValue(new AssetDate(DateOnly.FromDateTime(SelectedDate.Value)));
+        }
+
         if (trimmed.Length == 0)
         {
             return null;
@@ -251,7 +277,6 @@ public sealed class FieldEditorViewModel : ObservableObject
             FieldType.Text => new TextFieldValue(trimmed),
             FieldType.MultilineText => new MultilineTextFieldValue(Text),
             FieldType.Number => new NumberFieldValue(ParseNumber(trimmed)),
-            FieldType.Date => new DateFieldValue(AssetDate.ParseDisplay(trimmed)),
             FieldType.Url => new UrlFieldValue(trimmed),
             FieldType.FilePath => new FilePathFieldValue(trimmed),
             FieldType.FolderPath => new FolderPathFieldValue(trimmed),
@@ -279,6 +304,9 @@ public sealed class FieldEditorViewModel : ObservableObject
             _ when Definition.Type == FieldType.RecordStatus => "unchecked",
             _ => null,
         };
+        SelectedDate = value is DateFieldValue date
+            ? date.Value.Value.ToDateTime(TimeOnly.MinValue)
+            : null;
         TargetPathKind = value is TargetPathFieldValue target ? target.Kind : TargetPathKind.File;
 
         var selectedIds = value switch

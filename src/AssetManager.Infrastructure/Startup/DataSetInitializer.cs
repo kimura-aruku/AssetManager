@@ -198,9 +198,9 @@ public sealed class DataSetInitializer : IStartupInitializer
         return new ViewSettingsDocument(
             JsonDefaults.CurrentSchemaVersion,
             [
-                new ViewColumnDocument(MainTableColumns.Name.Value, 0, 240, true),
-                new ViewColumnDocument(MainTableColumns.AssetTypes.Value, 1, 160, true),
-                new ViewColumnDocument(MainTableColumns.TargetPath.Value, 2, 360, true),
+                new ViewColumnDocument(MainTableColumns.TargetPath.Value, 0, 360, true),
+                new ViewColumnDocument(MainTableColumns.Name.Value, 1, 240, true),
+                new ViewColumnDocument(MainTableColumns.AssetTypes.Value, 2, 160, true),
                 new ViewColumnDocument(MainTableColumns.LicenseSummary.Value, 3, 200, true),
             ]);
     }

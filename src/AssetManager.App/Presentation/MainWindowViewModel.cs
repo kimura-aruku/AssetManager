@@ -3,6 +3,7 @@ using System.Windows.Input;
 using AssetManager.App.Composition;
 using AssetManager.Application.Data;
 using AssetManager.Application.Paths;
+using AssetManager.Application.Records;
 using AssetManager.Application.Search;
 using AssetManager.Application.Startup;
 using AssetManager.Domain.Catalog;
@@ -21,6 +22,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly Dictionary<FieldId, FieldDefinition> _definitions = [];
     private readonly Dictionary<AssetTypeId, string> _typeNames = [];
     private readonly Dictionary<TagId, string> _tagNames = [];
+    private readonly List<AssetTypeDefinition> _assetTypes = [];
     private RecordSearchSession? _searchSession;
     private RecordRowViewModel? _selectedRecord;
     private SavedSearch? _selectedSavedSearch;
@@ -236,9 +238,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         _typeNames.Clear();
+        _assetTypes.Clear();
         foreach (var type in snapshot.AssetTypes)
         {
             _typeNames[type.Id] = type.Name;
+            _assetTypes.Add(type);
         }
 
         _tagNames.Clear();
@@ -380,7 +384,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
-        foreach (var definition in _definitions.Values.Where(definition => definition.DetailVisible))
+        foreach (var definition in _definitions.Values
+                     .Where(definition => definition.DetailVisible)
+                     .OrderBy(definition => definition.Id == BuiltInFieldIds.TargetPath ? 0 : 1))
         {
             var searchField = SearchFields.FirstOrDefault(field => field.Definition.Id == definition.Id);
             var options = searchField?.Options.Select(option => new SelectableOptionViewModel(option.Id, option.Label));
@@ -537,10 +543,40 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             var editor = DetailFields.Single(field => field.Definition.Id == BuiltInFieldIds.TargetPath);
             editor.TargetPathKind = path.Kind;
             editor.Text = path.Path;
+            ApplyFileSelectionDefaults(path);
         }
         catch (Exception exception)
         {
             _dialogs.ShowError($"対象パスを登録できませんでした。{Environment.NewLine}{exception.Message}");
+        }
+    }
+
+    private void ApplyFileSelectionDefaults(TargetPathFieldValue path)
+    {
+        if (path.Kind != TargetPathKind.File)
+        {
+            return;
+        }
+
+        var defaults = FileSelectionDefaultProvider.Create(path.Path, _assetTypes);
+        var nameEditor = DetailFields.Single(field => field.Definition.Id == BuiltInFieldIds.Name);
+        if (string.IsNullOrWhiteSpace(nameEditor.Text))
+        {
+            nameEditor.Text = defaults.SuggestedName;
+        }
+
+        var typesEditor = DetailFields.Single(field => field.Definition.Id == BuiltInFieldIds.AssetTypes);
+        if (typesEditor.Options.Any(option => option.IsSelected))
+        {
+            return;
+        }
+
+        var matchingIds = defaults.SuggestedTypeIds
+            .Select(id => id.Value)
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var option in typesEditor.Options)
+        {
+            option.IsSelected = matchingIds.Contains(option.Id);
         }
     }
 
