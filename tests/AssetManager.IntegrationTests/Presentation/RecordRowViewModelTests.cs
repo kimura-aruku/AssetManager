@@ -10,15 +10,15 @@ namespace AssetManager.IntegrationTests.Presentation;
 public sealed class RecordRowViewModelTests
 {
     [Fact]
-    public void RowExposesFavoriteAndLicenseExpiryForFixedColumns()
+    public void RowExposesFavoriteAndLicenseLastCheckedDateForFixedColumns()
     {
         var now = new DateTimeOffset(2026, 7, 20, 0, 0, 0, TimeSpan.Zero);
-        var expiry = new AssetDate(new DateOnly(2027, 3, 31));
+        var lastChecked = new AssetDate(new DateOnly(2027, 3, 31));
         var favoriteDefinition = GetDefinition(BuiltInFieldIds.Favorite);
-        var expiryDefinition = GetDefinition(BuiltInFieldIds.LicenseExpiryDate);
+        var lastCheckedDefinition = GetDefinition(BuiltInFieldIds.LicenseLastCheckedDate);
         var record = AssetRecord.Create(now)
             .SetValue(favoriteDefinition, new BooleanFieldValue(true), now)
-            .SetValue(expiryDefinition, new DateFieldValue(expiry), now);
+            .SetValue(lastCheckedDefinition, new DateFieldValue(lastChecked), now);
         var definitions = BuiltInFieldCatalog.All.ToDictionary(definition => definition.Id);
 
         var row = new RecordRowViewModel(
@@ -31,7 +31,7 @@ public sealed class RecordRowViewModelTests
             new Dictionary<string, AssetManager.Application.Paths.PathCheckResult>());
 
         Assert.Equal("★", row.FavoriteGlyph);
-        Assert.Equal(expiry.ToDisplayString(), row.LicenseExpiryDate);
+        Assert.Equal(lastChecked.ToDisplayString(), row.LicenseLastCheckedDate);
     }
 
     private static FieldDefinition GetDefinition(AssetManager.Domain.Identifiers.FieldId id)

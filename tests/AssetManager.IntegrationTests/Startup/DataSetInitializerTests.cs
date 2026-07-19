@@ -154,6 +154,77 @@ public sealed class DataSetInitializerTests
             loaded.Record.Record.GetValue<SingleSelectionFieldValue>(BuiltInFieldIds.AcquisitionSource)?.Value);
     }
 
+    [Fact]
+    public async Task RestartMigratesOverviewDetailAndLegacyNotesWithoutLosingText()
+    {
+        using var temporary = new TemporaryDirectory();
+        var paths = new AppDataPaths(temporary.Path);
+        var initializer = new DataSetInitializer(paths);
+        var firstResult = await initializer.InitializeAsync();
+        var layout = new DataRootLayout(firstResult.DataRoot);
+        var fileStore = new AtomicJsonFileStore();
+        var currentDetail = BuiltInFieldCatalog.All.Single(
+            definition => definition.Id == BuiltInFieldIds.Description);
+        var legacyDetail = FieldDefinition.CreateBuiltIn(
+            currentDetail.Id,
+            "説明",
+            FieldType.MultilineText,
+            SystemRole.Description);
+        var legacyNotes = FieldDefinition.CreateBuiltIn(
+            BuiltInFieldIds.Notes,
+            "備考",
+            FieldType.MultilineText,
+            SystemRole.Notes);
+        var legacyDefinitions = new List<FieldDefinition>();
+        foreach (var definition in BuiltInFieldCatalog.All)
+        {
+            if (definition.Id == BuiltInFieldIds.Overview)
+            {
+                continue;
+            }
+
+            if (definition.Id == BuiltInFieldIds.Description)
+            {
+                legacyDefinitions.Add(legacyDetail);
+                legacyDefinitions.Add(legacyNotes);
+            }
+            else
+            {
+                legacyDefinitions.Add(definition);
+            }
+        }
+
+        await new FieldDefinitionRepository(fileStore).SaveAsync(layout, legacyDefinitions);
+        var now = DateTimeOffset.UtcNow;
+        var record = AssetRecord.Create(now)
+            .SetValue(legacyDetail, new MultilineTextFieldValue("既存の説明"), now)
+            .SetValue(legacyNotes, new MultilineTextFieldValue("既存の備考"), now);
+        await new RecordRepository(fileStore).SaveAsync(layout, new PersistedAssetRecord(record));
+
+        _ = await initializer.InitializeAsync();
+
+        var definitions = await new FieldDefinitionRepository(fileStore).LoadAsync(layout);
+        var overviewIndex = Array.FindIndex(
+            definitions.ToArray(),
+            definition => definition.Id == BuiltInFieldIds.Overview);
+        var detailIndex = Array.FindIndex(
+            definitions.ToArray(),
+            definition => definition.Id == BuiltInFieldIds.Description);
+        Assert.True(overviewIndex >= 0 && overviewIndex < detailIndex);
+        Assert.Equal("概要", definitions[overviewIndex].Label);
+        Assert.Equal("詳細", definitions[detailIndex].Label);
+        Assert.DoesNotContain(definitions, definition => definition.Id == BuiltInFieldIds.Notes);
+
+        var loaded = await new RecordRepository(fileStore).LoadAsync(
+            layout,
+            RecordRepository.GetRecordPath(layout, record.Id),
+            definitions);
+        Assert.Equal(
+            $"既存の説明{Environment.NewLine}{Environment.NewLine}既存の備考",
+            loaded.Record.Record.GetValue<MultilineTextFieldValue>(BuiltInFieldIds.Description)?.Value);
+        Assert.False(loaded.Record.Record.Values.ContainsKey(BuiltInFieldIds.Notes));
+    }
+
     private sealed class CollectingProgress : IProgress<StartupProgress>
     {
         public List<StartupProgress> Values { get; } = [];

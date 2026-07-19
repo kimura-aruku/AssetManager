@@ -96,9 +96,23 @@ public static class DomainModelValidator
         var canonicalDefinitions = BuiltInFieldCatalog.All.ToDictionary(definition => definition.Id);
         foreach (var definition in copied.Where(definition => definition.Origin == FieldOrigin.BuiltIn))
         {
-            if (!canonicalDefinitions.TryGetValue(definition.Id, out var canonical)
-                || (!HasCanonicalFixedDefinition(definition, canonical)
-                    && !IsLegacyAcquisitionSourceDefinition(definition, canonical)))
+            if (!canonicalDefinitions.TryGetValue(definition.Id, out var canonical))
+            {
+                if (IsLegacyNotesDefinition(definition))
+                {
+                    continue;
+                }
+
+                issues.Add(new ValidationIssue(
+                    ValidationIssueCode.InvalidBuiltInFieldDefinition,
+                    $"標準カラム'{definition.Id}'の固定定義が変更されています。",
+                    definition.Id));
+                continue;
+            }
+
+            if (!HasCanonicalFixedDefinition(definition, canonical)
+                && !IsLegacyAcquisitionSourceDefinition(definition, canonical)
+                && !IsLegacyDescriptionDefinition(definition, canonical))
             {
                 issues.Add(new ValidationIssue(
                     ValidationIssueCode.InvalidBuiltInFieldDefinition,
@@ -108,6 +122,34 @@ public static class DomainModelValidator
         }
 
         return issues;
+    }
+
+    private static bool IsLegacyDescriptionDefinition(
+        FieldDefinition definition,
+        FieldDefinition canonical)
+    {
+        return definition.Id == BuiltInFieldIds.Description
+            && definition.Label == "説明"
+            && canonical.Label == "詳細"
+            && definition.Type == canonical.Type
+            && definition.SystemRole == canonical.SystemRole
+            && definition.MainTableRequired == canonical.MainTableRequired
+            && definition.UserCanHide == canonical.UserCanHide
+            && definition.UserCanRename == canonical.UserCanRename
+            && definition.UserCanChangeType == canonical.UserCanChangeType
+            && definition.UserCanDelete == canonical.UserCanDelete;
+    }
+
+    private static bool IsLegacyNotesDefinition(FieldDefinition definition)
+    {
+        return definition.Id == BuiltInFieldIds.Notes
+            && definition.Label == "備考"
+            && definition.Type == FieldType.MultilineText
+            && definition.SystemRole == SystemRole.Notes
+            && !definition.MainTableRequired
+            && !definition.UserCanRename
+            && !definition.UserCanChangeType
+            && !definition.UserCanDelete;
     }
 
     private static bool HasCanonicalFixedDefinition(

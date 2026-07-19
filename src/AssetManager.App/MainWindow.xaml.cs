@@ -74,8 +74,8 @@ public partial class MainWindow : Window
                     Mode = BindingMode.OneWay,
                 },
             };
-            var expiryColumnIndex = RecordsGrid.Columns.IndexOf(LicenseExpiryColumn);
-            RecordsGrid.Columns.Insert(expiryColumnIndex, column);
+            var lastCheckedColumnIndex = RecordsGrid.Columns.IndexOf(LicenseLastCheckedColumn);
+            RecordsGrid.Columns.Insert(lastCheckedColumnIndex, column);
             _dynamicColumns.Add(column);
         }
     }

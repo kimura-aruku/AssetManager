@@ -702,8 +702,8 @@ public sealed class RecordRowViewModel
             ? string.Join(", ", types.Values.Select(id => typeNames.GetValueOrDefault(id, id.Value)))
             : string.Empty;
         TargetPath = record.TargetPath?.Path ?? string.Empty;
-        LicenseExpiryDate = record
-            .GetValue<DateFieldValue>(BuiltInFieldIds.LicenseExpiryDate)?
+        LicenseLastCheckedDate = record
+            .GetValue<DateFieldValue>(BuiltInFieldIds.LicenseLastCheckedDate)?
             .Value
             .ToDisplayString() ?? string.Empty;
         License = CreateLicenseSummary(record);
@@ -735,7 +735,7 @@ public sealed class RecordRowViewModel
 
     public string TargetPath { get; }
 
-    public string LicenseExpiryDate { get; }
+    public string LicenseLastCheckedDate { get; }
 
     public string License { get; }
 

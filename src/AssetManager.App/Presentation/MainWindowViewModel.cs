@@ -333,7 +333,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         foreach (var definition in snapshot.FieldDefinitions.Where(definition =>
                      !definition.MainTableRequired
                      && definition.Id != BuiltInFieldIds.Favorite
-                     && definition.Id != BuiltInFieldIds.LicenseExpiryDate))
+                     && definition.Id != BuiltInFieldIds.LicenseLastCheckedDate))
         {
             var visible = settingMap.TryGetValue(definition.Id.Value, out var setting)
                 ? setting.Visible

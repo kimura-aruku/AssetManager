@@ -10,7 +10,9 @@ public static class BuiltInFieldIds
     public static readonly FieldId Tags = new("builtin.tags");
     public static readonly FieldId Status = new("builtin.status");
     public static readonly FieldId Favorite = new("builtin.favorite");
+    public static readonly FieldId Overview = new("builtin.overview");
     public static readonly FieldId Description = new("builtin.description");
+    // 既存データを「詳細」へ移行するために旧IDを保持する。標準カタログには含めない。
     public static readonly FieldId Notes = new("builtin.notes");
     public static readonly FieldId CurrentVersion = new("builtin.currentVersion");
     public static readonly FieldId AssetUpdatedDate = new("builtin.assetUpdatedDate");

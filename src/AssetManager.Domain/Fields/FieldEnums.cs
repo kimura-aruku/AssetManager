@@ -35,7 +35,9 @@ public enum SystemRole
     Tags,
     Status,
     Favorite,
+    Overview,
     Description,
+    // 既存データ移行専用。新しい標準カラムには使用しない。
     Notes,
     CurrentVersion,
     AssetUpdatedDate,

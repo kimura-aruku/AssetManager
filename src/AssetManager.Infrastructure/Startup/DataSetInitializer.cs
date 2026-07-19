@@ -1,5 +1,6 @@
 using AssetManager.Application.Startup;
 using AssetManager.Application.Catalog;
+using AssetManager.Application.Fields;
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
@@ -82,6 +83,13 @@ public sealed class DataSetInitializer : IStartupInitializer
             Report(progress, "管理データを読み込んでいます。", 7);
             var snapshot = await loader.LoadAsync(layout, cancellationToken).ConfigureAwait(false);
             var dataStore = new JsonAssetManagerDataStore(layout, _store);
+            if (await new StandardFieldMigrationService(dataStore)
+                    .MigrateAsync(cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                snapshot = await loader.LoadAsync(layout, cancellationToken).ConfigureAwait(false);
+            }
+
             if (await new AcquisitionSourceMigrationService(dataStore)
                     .MigrateAsync(cancellationToken)
                     .ConfigureAwait(false))
