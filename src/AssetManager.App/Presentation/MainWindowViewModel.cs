@@ -470,7 +470,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"レコードを保存できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"レコードを保存できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
             StatusMessage = "保存に失敗しました。";
         }
     }
@@ -508,7 +508,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"選択範囲をコピーできませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"選択範囲をコピーできませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -533,7 +533,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"選択範囲へ貼り付けできませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"選択範囲へ貼り付けできませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -578,7 +578,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"レコードを削除できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"レコードを削除できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -615,7 +615,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"操作を元に戻せませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"操作を元に戻せませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -633,7 +633,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"操作をやり直せませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"操作をやり直せませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -656,7 +656,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"対象パスを登録できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"対象パスを登録できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -719,7 +719,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"Windowsでパスを開けませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"Windowsでパスを開けませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -734,7 +734,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"管理画面の変更を再読み込みできませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"管理画面の変更を再読み込みできませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -752,7 +752,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"検索条件を保存できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"検索条件を保存できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -803,7 +803,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"表示カラム設定を保存できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"表示カラム設定を保存できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -849,7 +849,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"パス確認に失敗しました。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"パス確認に失敗しました。{Environment.NewLine}{exception.Message}", exception: exception);
             StatusMessage = "パス確認に失敗しました。";
         }
         finally

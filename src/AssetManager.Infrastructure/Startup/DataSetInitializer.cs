@@ -87,7 +87,15 @@ public sealed class DataSetInitializer : IStartupInitializer
                 snapshot.RecordLoadResult.Failures.Count,
                 createdInitialData,
                 snapshot.Settings.CheckPathsOnStartup,
-                snapshot.Settings.LicenseWarningDays);
+                snapshot.Settings.LicenseWarningDays,
+                snapshot.RecordLoadResult.Repairs.Select(repair => new StartupRepairDetail(
+                    repair.RecordId.ToString(),
+                    repair.FieldId,
+                    repair.Reason,
+                    repair.OriginalContent)).ToArray(),
+                snapshot.RecordLoadResult.Failures.Select(failure => new StartupExcludedRecordDetail(
+                    failure.Path,
+                    failure.Error)).ToArray());
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

@@ -225,7 +225,7 @@ public sealed class ManagementWindowViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"管理データを読み込めませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"管理データを読み込めませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -287,7 +287,7 @@ public sealed class ManagementWindowViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"カスタムカラムを保存できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"カスタムカラムを保存できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -309,7 +309,7 @@ public sealed class ManagementWindowViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"カスタムカラムを削除できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"カスタムカラムを削除できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -326,7 +326,7 @@ public sealed class ManagementWindowViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"種類を保存できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"種類を保存できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -346,7 +346,7 @@ public sealed class ManagementWindowViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"種類を削除できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"種類を削除できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -362,7 +362,7 @@ public sealed class ManagementWindowViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"タグ分類を保存できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"タグ分類を保存できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -382,7 +382,7 @@ public sealed class ManagementWindowViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"タグ分類を削除できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"タグ分類を削除できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -399,7 +399,7 @@ public sealed class ManagementWindowViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"タグを保存できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"タグを保存できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -419,7 +419,7 @@ public sealed class ManagementWindowViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"タグを削除できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"タグを削除できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 

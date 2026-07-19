@@ -29,7 +29,17 @@ public sealed record StartupResult(
     int ExcludedRecordCount,
     bool CreatedInitialData,
     bool CheckPathsOnStartup,
-    int LicenseWarningDays);
+    int LicenseWarningDays,
+    IReadOnlyList<StartupRepairDetail> Repairs,
+    IReadOnlyList<StartupExcludedRecordDetail> ExcludedRecords);
+
+public sealed record StartupRepairDetail(
+    string RecordId,
+    string FieldId,
+    string Reason,
+    string OriginalContent);
+
+public sealed record StartupExcludedRecordDetail(string Path, string Error);
 
 public interface IStartupInitializer
 {

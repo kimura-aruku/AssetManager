@@ -87,7 +87,7 @@ public sealed class SettingsWindowViewModel : ObservableObject
         catch (Exception exception)
         {
             StatusMessage = "設定を読み込めませんでした。";
-            _dialogs.ShowError($"設定を読み込めませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"設定を読み込めませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -109,7 +109,7 @@ public sealed class SettingsWindowViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"設定を保存できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"設定を保存できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
@@ -151,7 +151,7 @@ public sealed class SettingsWindowViewModel : ObservableObject
         catch (Exception exception)
         {
             StatusMessage = "保存先を変更できませんでした。元の保存先を引き続き使用します。";
-            _dialogs.ShowError($"データ保存先を変更できませんでした。{Environment.NewLine}{exception.Message}");
+            _dialogs.ShowError($"データ保存先を変更できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 }

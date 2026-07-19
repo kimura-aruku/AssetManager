@@ -5,6 +5,9 @@ using AssetManager.Infrastructure.Persistence.Json;
 using AssetManager.Infrastructure.Persistence.Models;
 using AssetManager.Infrastructure.Persistence.Repositories;
 using AssetManager.Infrastructure.Startup;
+using AssetManager.Domain.Fields;
+using AssetManager.Domain.Identifiers;
+using System.Text.Json;
 
 namespace AssetManager.IntegrationTests.Startup;
 
@@ -65,6 +68,41 @@ public sealed class DataSetInitializerTests
         Assert.Equal(customized, await settingsRepository.LoadAsync(layout));
         Assert.False(File.Exists(staleHistory));
         Assert.True(Directory.Exists(layout.UndoDirectory));
+    }
+
+    [Fact]
+    public async Task RestartReturnsRepairAndExcludedRecordDetails()
+    {
+        using var temporary = new TemporaryDirectory();
+        var paths = new AppDataPaths(temporary.Path);
+        var initializer = new DataSetInitializer(paths);
+        var firstResult = await initializer.InitializeAsync();
+        var layout = new DataRootLayout(firstResult.DataRoot);
+        var recordId = RecordId.New();
+        var repairedPath = RecordRepository.GetRecordPath(layout, recordId);
+        var invalidDate = JsonSerializer.SerializeToElement("invalid-date");
+        var document = new RecordDocument(
+            1,
+            recordId.ToString(),
+            new Dictionary<string, JsonElement>
+            {
+                [BuiltInFieldIds.AcquiredDate.Value] = invalidDate,
+            },
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow);
+        await new AtomicJsonFileStore().SaveAsync(repairedPath, document);
+        var excludedPath = Path.Combine(layout.RecordsDirectory, $"{RecordId.New()}.json");
+        await File.WriteAllTextAsync(excludedPath, "{ broken json");
+
+        var result = await initializer.InitializeAsync();
+
+        var repair = Assert.Single(result.Repairs);
+        Assert.Equal(recordId.ToString(), repair.RecordId);
+        Assert.Equal(BuiltInFieldIds.AcquiredDate.Value, repair.FieldId);
+        Assert.Contains("invalid-date", repair.OriginalContent, StringComparison.Ordinal);
+        var excluded = Assert.Single(result.ExcludedRecords);
+        Assert.Equal(excludedPath, excluded.Path);
+        Assert.NotEmpty(excluded.Error);
     }
 
     private sealed class CollectingProgress : IProgress<StartupProgress>

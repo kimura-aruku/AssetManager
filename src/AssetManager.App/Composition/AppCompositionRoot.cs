@@ -42,7 +42,7 @@ internal static class AppCompositionRoot
         StartupResult startupResult,
         AppRuntimeServices runtime)
     {
-        var dialogs = new WpfUserDialogService();
+        var dialogs = new WpfUserDialogService(runtime.Logger);
         var viewModel = new MainWindowViewModel(
             startupResult,
             runtime,
@@ -55,9 +55,21 @@ internal static class AppCompositionRoot
         };
     }
 
-    public static AppRuntimeServices CreateRuntimeServices(StartupResult startupResult)
+    public static StartupIssuesWindow CreateStartupIssuesWindow(StartupResult startupResult)
+    {
+        return new StartupIssuesWindow
+        {
+            DataContext = new StartupIssuesViewModel(startupResult),
+            Owner = System.Windows.Application.Current.MainWindow,
+        };
+    }
+
+    public static AppRuntimeServices CreateRuntimeServices(
+        StartupResult startupResult,
+        IApplicationLogger logger)
     {
         ArgumentNullException.ThrowIfNull(startupResult);
+        ArgumentNullException.ThrowIfNull(logger);
         var layout = new DataRootLayout(startupResult.DataRoot);
         var store = new JsonAssetManagerDataStore(layout);
         var fileSystem = new PhysicalWindowsPathFileSystem();
@@ -70,6 +82,7 @@ internal static class AppCompositionRoot
         var settings = new AppSettingsService(new JsonAppSettingsStore(layout));
         var dataRootMigration = new DataRootMigrationService(AppDataPaths.CreateDefault());
         return new AppRuntimeServices(
+            logger,
             store,
             undoRedo,
             records,
@@ -91,7 +104,7 @@ internal static class AppCompositionRoot
                         store,
                         fields,
                         catalog,
-                        new WpfUserDialogService()),
+                        new WpfUserDialogService(logger)),
                     Owner = System.Windows.Application.Current.MainWindow,
                 };
                 _ = window.ShowDialog();
@@ -106,7 +119,7 @@ internal static class AppCompositionRoot
                         dataRootMigration,
                         startupResult.DataRoot,
                         () => picker.PickFolder("空のデータ保存先フォルダーを選択"),
-                        new WpfUserDialogService(),
+                        new WpfUserDialogService(logger),
                         () => System.Windows.Application.Current.Shutdown()),
                     Owner = System.Windows.Application.Current.MainWindow,
                 };
@@ -120,6 +133,7 @@ internal sealed record AppServices(
     IStartupInitializer StartupInitializer);
 
 internal sealed record AppRuntimeServices(
+    IApplicationLogger Logger,
     IAssetManagerDataStore Store,
     UndoRedoService UndoRedo,
     RecordApplicationService Records,

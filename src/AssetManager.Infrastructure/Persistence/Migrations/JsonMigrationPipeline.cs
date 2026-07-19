@@ -84,7 +84,20 @@ public sealed class DatasetMigrationService(
 
         foreach (var path in documentPaths.Where(path => path != layout.ManifestFile))
         {
-            var change = await CreateChangeIfRequiredAsync(layout, path, cancellationToken).ConfigureAwait(false);
+            JsonFileChange? change;
+            try
+            {
+                change = await CreateChangeIfRequiredAsync(layout, path, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (
+                IsRecordPath(layout, path)
+                && exception is System.Text.Json.JsonException or DataPersistenceException)
+            {
+                // Individual record failures are reported and excluded by RecordRepository.
+                // Core documents remain critical and still abort startup.
+                continue;
+            }
+
             if (change is not null)
             {
                 changes.Add(change);
@@ -107,6 +120,14 @@ public sealed class DatasetMigrationService(
 
         _ = await transactions.ExecuteAsync(layout, changes, cancellationToken).ConfigureAwait(false);
         return true;
+    }
+
+    private static bool IsRecordPath(DataRootLayout layout, string path)
+    {
+        return string.Equals(
+            Path.GetDirectoryName(Path.GetFullPath(path)),
+            Path.GetFullPath(layout.RecordsDirectory),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<JsonFileChange?> CreateChangeIfRequiredAsync(

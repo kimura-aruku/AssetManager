@@ -57,7 +57,7 @@ public partial class App : System.Windows.Application
             var result = await services.StartupInitializer.InitializeAsync(
                 startupProgress,
                 _lifetimeCancellation.Token);
-            var runtime = AppCompositionRoot.CreateRuntimeServices(result);
+            var runtime = AppCompositionRoot.CreateRuntimeServices(result, services.Logger);
             _undoRedo = runtime.UndoRedo;
             await _undoRedo.InitializeAsync(_lifetimeCancellation.Token);
 
@@ -70,6 +70,13 @@ public partial class App : System.Windows.Application
             ShutdownMode = ShutdownMode.OnMainWindowClose;
             mainWindow.Show();
             startupWindow.Close();
+            if (result.Repairs.Count > 0 || result.ExcludedRecords.Count > 0)
+            {
+                await LogStartupIssuesAsync(result);
+                var issuesWindow = AppCompositionRoot.CreateStartupIssuesWindow(result);
+                _ = issuesWindow.ShowDialog();
+            }
+
             if (result.CheckPathsOnStartup
                 && mainWindow.DataContext is MainWindowViewModel mainWindowViewModel)
             {
@@ -205,6 +212,26 @@ public partial class App : System.Windows.Application
         }
         catch (Exception)
         {
+        }
+    }
+
+    private async Task LogStartupIssuesAsync(StartupResult result)
+    {
+        if (_logger is null)
+        {
+            return;
+        }
+
+        foreach (var repair in result.Repairs)
+        {
+            await _logger.LogInformationAsync(
+                $"レコード値を初期化しました。record={repair.RecordId}, field={repair.FieldId}, reason={repair.Reason}, original={repair.OriginalContent}");
+        }
+
+        foreach (var excluded in result.ExcludedRecords)
+        {
+            await _logger.LogInformationAsync(
+                $"読み込めないレコードを除外しました。path={excluded.Path}, error={excluded.Error}");
         }
     }
 
