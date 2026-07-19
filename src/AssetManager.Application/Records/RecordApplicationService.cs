@@ -1,5 +1,6 @@
 using AssetManager.Application.Data;
 using AssetManager.Application.History;
+using AssetManager.Application.Paths;
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Common;
 using AssetManager.Domain.Fields;
@@ -54,6 +55,7 @@ public sealed class RecordApplicationService
             now);
         record = AssignTypesFromTargetFile(record, snapshot.FieldDefinitions, snapshot.AssetTypes, now);
         ValidateRecord(record, snapshot);
+        EnsureNoDuplicateTargetPath(record, snapshot.Records);
         await ApplyChangeAsync(
             new UndoableDataChange(
                 "レコードを作成",
@@ -75,6 +77,7 @@ public sealed class RecordApplicationService
         var updated = ApplyChanges(existing, changes, snapshot.FieldDefinitions, now);
         updated = AssignTypesFromTargetFile(updated, snapshot.FieldDefinitions, snapshot.AssetTypes, now);
         ValidateRecord(updated, snapshot);
+        EnsureNoDuplicateTargetPath(updated, snapshot.Records);
         await ApplyChangeAsync(
             new UndoableDataChange(
                 "レコードを編集",
@@ -130,7 +133,10 @@ public sealed class RecordApplicationService
             ValidateRecord(updated, snapshot);
             changes.Add(new RecordStateChange(id, existing, updated));
             results.Add(updated);
+            recordMap[id] = updated;
         }
+
+        EnsureNoDuplicateTargetPaths(recordMap.Values);
 
         await ApplyChangeAsync(
             new UndoableDataChange(description, changes),
@@ -159,9 +165,10 @@ public sealed class RecordApplicationService
                 throw new DomainValidationException($"未定義のカラム'{fieldId}'は更新できません。", nameof(changes));
             }
 
-            updated = value is null
+            var normalizedValue = value is null ? null : NormalizePathValue(value);
+            updated = normalizedValue is null
                 ? updated.RemoveValue(fieldId, updatedAt)
-                : updated.SetValue(definition, value, updatedAt);
+                : updated.SetValue(definition, normalizedValue, updatedAt);
         }
 
         return updated;
@@ -222,5 +229,71 @@ public sealed class RecordApplicationService
         return _history is null
             ? _store.ApplyDataChangeAsync(change, useAfter: true, cancellationToken)
             : _history.ExecuteAsync(change, cancellationToken);
+    }
+
+    private static void EnsureNoDuplicateTargetPath(
+        AssetRecord candidate,
+        IReadOnlyList<AssetRecord> records)
+    {
+        if (candidate.TargetPath is null)
+        {
+            return;
+        }
+
+        var key = WindowsPathNormalizer.CreateComparisonKey(candidate.TargetPath.Path);
+        var conflict = records.FirstOrDefault(record =>
+            record.Id != candidate.Id
+            && record.TargetPath is not null
+            && string.Equals(
+                WindowsPathNormalizer.CreateComparisonKey(record.TargetPath.Path),
+                key,
+                StringComparison.OrdinalIgnoreCase));
+        if (conflict is not null)
+        {
+            throw CreateDuplicateException(candidate.TargetPath.Path, conflict);
+        }
+    }
+
+    private static void EnsureNoDuplicateTargetPaths(IEnumerable<AssetRecord> records)
+    {
+        var pathOwners = new Dictionary<string, AssetRecord>(StringComparer.OrdinalIgnoreCase);
+        foreach (var record in records.Where(record => record.TargetPath is not null))
+        {
+            var path = record.TargetPath!.Path;
+            var key = WindowsPathNormalizer.CreateComparisonKey(path);
+            if (pathOwners.TryGetValue(key, out var conflict))
+            {
+                throw CreateDuplicateException(path, conflict);
+            }
+
+            pathOwners[key] = record;
+        }
+    }
+
+    private static DuplicateTargetPathException CreateDuplicateException(
+        string path,
+        AssetRecord conflict)
+    {
+        var name = conflict.GetValue<TextFieldValue>(BuiltInFieldIds.Name)?.Value;
+        return new DuplicateTargetPathException(path, conflict.Id.ToString(), name);
+    }
+
+    private static FieldValue NormalizePathValue(FieldValue value)
+    {
+        return value switch
+        {
+            TargetPathFieldValue target => new TargetPathFieldValue(
+                target.Kind,
+                WindowsPathNormalizer.NormalizeForStorage(target.Path)),
+            FilePathFieldValue file => new FilePathFieldValue(
+                WindowsPathNormalizer.NormalizeForStorage(file.Value)),
+            FolderPathFieldValue folder => new FolderPathFieldValue(
+                WindowsPathNormalizer.NormalizeForStorage(folder.Value)),
+            RelatedDocumentListFieldValue documents => new RelatedDocumentListFieldValue(
+                documents.Values.Select(document => new RelatedDocument(
+                    document.Title,
+                    WindowsPathNormalizer.NormalizeForStorage(document.Path)))),
+            _ => value,
+        };
     }
 }

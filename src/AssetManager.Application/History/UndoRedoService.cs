@@ -1,4 +1,5 @@
 using AssetManager.Application.Data;
+using AssetManager.Application.Paths;
 using AssetManager.Domain.Common;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Records;
@@ -216,7 +217,9 @@ public sealed class UndoRedoService : IAsyncDisposable
 
         var duplicate = records.Values
             .Where(record => record.TargetPath is not null)
-            .GroupBy(record => NormalizePathKey(record.TargetPath!.Path), StringComparer.OrdinalIgnoreCase)
+            .GroupBy(
+                record => WindowsPathNormalizer.CreateComparisonKey(record.TargetPath!.Path),
+                StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault(group => group.Count() > 1);
         if (duplicate is not null)
         {
@@ -225,9 +228,4 @@ public sealed class UndoRedoService : IAsyncDisposable
         }
     }
 
-    private static string NormalizePathKey(string path)
-    {
-        return path.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar)
-            .TrimEnd(Path.DirectorySeparatorChar);
-    }
 }

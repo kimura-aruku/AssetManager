@@ -27,7 +27,8 @@ public sealed record StartupResult(
     int RecordCount,
     int RepairedValueCount,
     int ExcludedRecordCount,
-    bool CreatedInitialData);
+    bool CreatedInitialData,
+    bool CheckPathsOnStartup);
 
 public interface IStartupInitializer
 {

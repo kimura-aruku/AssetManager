@@ -1,5 +1,6 @@
 using AssetManager.Application.Data;
 using AssetManager.Application.Records;
+using AssetManager.Application.Paths;
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Common;
 using AssetManager.Domain.Fields;
@@ -67,7 +68,9 @@ public sealed class RecordApplicationServiceTests
         });
         var folderRecord = await service.CreateAsync(new Dictionary<FieldId, FieldValue?>
         {
-            [BuiltInFieldIds.TargetPath] = new TargetPathFieldValue(TargetPathKind.Folder, @"C:\Assets\sound.wav"),
+            [BuiltInFieldIds.TargetPath] = new TargetPathFieldValue(
+                TargetPathKind.Folder,
+                @"C:\Assets\sound-folder.wav"),
         });
 
         Assert.Equal(
@@ -110,6 +113,55 @@ public sealed class RecordApplicationServiceTests
             {
                 [FieldId.From(CustomFieldId.New())] = new TextFieldValue("値"),
             }));
+    }
+
+    [Fact]
+    public async Task DuplicateTargetPathUsesOrdinalIgnoreCaseComparison()
+    {
+        var store = CreateStore();
+        var service = new RecordApplicationService(store, new FixedTimeProvider(TestTime));
+        var first = await service.CreateAsync(new Dictionary<FieldId, FieldValue?>
+        {
+            [BuiltInFieldIds.Name] = new TextFieldValue("既存素材"),
+            [BuiltInFieldIds.TargetPath] = new TargetPathFieldValue(
+                TargetPathKind.File,
+                @"C:\Assets\Image.PNG"),
+        });
+
+        var exception = await Assert.ThrowsAsync<DuplicateTargetPathException>(() => service.CreateAsync(
+            new Dictionary<FieldId, FieldValue?>
+            {
+                [BuiltInFieldIds.TargetPath] = new TargetPathFieldValue(
+                    TargetPathKind.File,
+                    @"c:/assets/image.png"),
+            }));
+
+        Assert.Equal(first.Id.ToString(), exception.ConflictingRecordId);
+        Assert.Equal("既存素材", exception.ConflictingRecordName);
+        Assert.Single(store.Snapshot.Records);
+    }
+
+    [Fact]
+    public async Task DeletedRecordDoesNotParticipateInDuplicateCheck()
+    {
+        var store = CreateStore();
+        var service = new RecordApplicationService(store, new FixedTimeProvider(TestTime));
+        var first = await service.CreateAsync(new Dictionary<FieldId, FieldValue?>
+        {
+            [BuiltInFieldIds.TargetPath] = new TargetPathFieldValue(
+                TargetPathKind.File,
+                @"C:\Assets\Image.PNG"),
+        });
+        await service.DeleteAsync(first.Id);
+
+        var replacement = await service.CreateAsync(new Dictionary<FieldId, FieldValue?>
+        {
+            [BuiltInFieldIds.TargetPath] = new TargetPathFieldValue(
+                TargetPathKind.File,
+                @"c:/assets/image.png"),
+        });
+
+        Assert.Equal(replacement, Assert.Single(store.Snapshot.Records));
     }
 
     private static TestDataStore CreateStore(params AssetTypeDefinition[] types)

@@ -44,9 +44,14 @@
                    HorizontalAlignment="Center"
                    Style="{StaticResource BodyTextStyle}"
                    Text="{Binding RecordCount, StringFormat=登録素材: {0} 件}" />
-        <Button HorizontalAlignment="Center"
-                Command="{Binding ConfirmEnvironmentCommand}"
-                Content="準備状態を確認" />
+        <StackPanel HorizontalAlignment="Center"
+                    Orientation="Horizontal">
+          <Button Command="{Binding CheckAllPathsCommand}"
+                  Content="全レコードのパスを確認" />
+          <Button Margin="8,0,0,0"
+                  Command="{Binding CancelPathCheckCommand}"
+                  Content="キャンセル" />
+        </StackPanel>
       </StackPanel>
     </Border>
 

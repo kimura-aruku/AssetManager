@@ -57,14 +57,20 @@ public partial class App : System.Windows.Application
             var result = await services.StartupInitializer.InitializeAsync(
                 startupProgress,
                 _lifetimeCancellation.Token);
-            _undoRedo = AppCompositionRoot.CreateUndoRedoService(result);
+            var runtime = AppCompositionRoot.CreateRuntimeServices(result);
+            _undoRedo = runtime.UndoRedo;
             await _undoRedo.InitializeAsync(_lifetimeCancellation.Token);
 
-            var mainWindow = AppCompositionRoot.CreateMainWindow(result);
+            var mainWindow = AppCompositionRoot.CreateMainWindow(result, runtime.PathChecks);
             MainWindow = mainWindow;
             ShutdownMode = ShutdownMode.OnMainWindowClose;
             mainWindow.Show();
             startupWindow.Close();
+            if (result.CheckPathsOnStartup
+                && mainWindow.DataContext is MainWindowViewModel mainWindowViewModel)
+            {
+                _ = mainWindowViewModel.StartInitialPathCheckAsync();
+            }
 
             _activationListener = _singleInstance.ListenForActivationAsync(
                 ActivateMainWindow,
