@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:windows="clr-namespace:AssetManager.App.Windows"
+        xmlns:status="clr-namespace:AssetManager.Application.Status;assembly=AssetManager.Application"
         Title="AssetManager"
         Width="1480"
         Height="860"
@@ -212,7 +213,68 @@
             <DataGridTextColumn Width="38" Header="★" SortMemberPath="builtin.favorite" Binding="{Binding FavoriteGlyph}" />
             <DataGridTextColumn Width="1.3*" MinWidth="150" Header="素材名" SortMemberPath="builtin.name" Binding="{Binding Name}" />
             <DataGridTextColumn Width="120" Header="種類" SortMemberPath="builtin.assetTypes" Binding="{Binding Types}" />
-            <DataGridTextColumn Width="1.4*" MinWidth="150" Header="ライセンス条件" SortMemberPath="computed.licenseSummary" Binding="{Binding License}" />
+            <DataGridTemplateColumn Width="110" Header="状態" SortMemberPath="computed.statusIndicators">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <ItemsControl ItemsSource="{Binding StatusIndicators}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border Margin="1" Padding="4,1" CornerRadius="3" ToolTip="{Binding ToolTip}">
+                          <Border.Style>
+                            <Style TargetType="Border">
+                              <Setter Property="Background" Value="{DynamicResource BorderBrush}" />
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding Severity}" Value="{x:Static status:RecordIndicatorSeverity.Error}">
+                                  <Setter Property="Background" Value="{DynamicResource DangerBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Severity}" Value="{x:Static status:RecordIndicatorSeverity.Warning}">
+                                  <Setter Property="Background" Value="{DynamicResource WarningBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Severity}" Value="{x:Static status:RecordIndicatorSeverity.Success}">
+                                  <Setter Property="Background" Value="{DynamicResource SuccessBrush}" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Border.Style>
+                          <TextBlock Foreground="White" FontWeight="Bold" FontSize="11" Text="{Binding Glyph}" />
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTemplateColumn Width="1.4*" MinWidth="150" Header="ライセンス条件" SortMemberPath="computed.licenseSummary">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <ItemsControl ItemsSource="{Binding LicenseBadges}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border Margin="1" Padding="4,1" CornerRadius="3" ToolTip="{Binding ToolTip}">
+                          <Border.Style>
+                            <Style TargetType="Border">
+                              <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsRequired}" Value="True">
+                                  <Setter Property="Background" Value="{DynamicResource WarningBrush}" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Border.Style>
+                          <TextBlock Foreground="White" FontWeight="Bold" FontSize="10" Text="{Binding Glyph}" />
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
           </DataGrid.Columns>
         </DataGrid>
         <Button Grid.Row="2"

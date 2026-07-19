@@ -2,10 +2,12 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using AssetManager.Application.Search;
+using AssetManager.Application.Status;
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Common;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
+using AssetManager.Domain.Licensing;
 using AssetManager.Domain.Records;
 using AssetManager.Domain.Values;
 
@@ -509,7 +511,10 @@ public sealed class RecordRowViewModel
         AssetRecord record,
         IReadOnlyDictionary<AssetTypeId, string> typeNames,
         IReadOnlyDictionary<TagId, string> tagNames,
-        IReadOnlyDictionary<FieldId, FieldDefinition> definitions)
+        IReadOnlyDictionary<FieldId, FieldDefinition> definitions,
+        AssetDate today,
+        LicenseWarningPolicy warningPolicy,
+        IReadOnlyDictionary<string, AssetManager.Application.Paths.PathCheckResult> pathResults)
     {
         Record = record;
         Name = record.GetValue<TextFieldValue>(BuiltInFieldIds.Name)?.Value ?? "（名称未設定）";
@@ -520,6 +525,12 @@ public sealed class RecordRowViewModel
             : string.Empty;
         TargetPath = record.TargetPath?.Path ?? string.Empty;
         License = CreateLicenseSummary(record);
+        LicenseBadges = LicenseBadgeEvaluator.Evaluate(LicenseTerms.FromRecord(record));
+        StatusIndicators = RecordIndicatorEvaluator.Evaluate(
+            record,
+            today,
+            warningPolicy,
+            pathResults);
         DynamicValues = definitions.ToDictionary(
             pair => pair.Key.Value,
             pair => FormatDynamicValue(
@@ -543,6 +554,10 @@ public sealed class RecordRowViewModel
     public string TargetPath { get; }
 
     public string License { get; }
+
+    public IReadOnlyList<LicenseBadge> LicenseBadges { get; }
+
+    public IReadOnlyList<RecordIndicator> StatusIndicators { get; }
 
     public IReadOnlyDictionary<string, string> DynamicValues { get; }
 

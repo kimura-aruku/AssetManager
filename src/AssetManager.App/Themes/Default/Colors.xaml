@@ -10,6 +10,7 @@
   <Color x:Key="DangerColor">#FFB42318</Color>
   <Color x:Key="WarningColor">#FFB54708</Color>
   <Color x:Key="SelectionColor">#FFE8F0FC</Color>
+  <Color x:Key="SuccessColor">#FF217A4A</Color>
 
   <SolidColorBrush x:Key="AppBackgroundBrush"
                    Color="{StaticResource AppBackgroundColor}" />
@@ -31,4 +32,6 @@
                    Color="{StaticResource WarningColor}" />
   <SolidColorBrush x:Key="SelectionBrush"
                    Color="{StaticResource SelectionColor}" />
+  <SolidColorBrush x:Key="SuccessBrush"
+                   Color="{StaticResource SuccessColor}" />
 </ResourceDictionary>

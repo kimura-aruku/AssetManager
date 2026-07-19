@@ -54,7 +54,7 @@ public partial class MainWindow : Window
 
     private void RebuildDynamicColumns(MainWindowViewModel viewModel)
     {
-        while (RecordsGrid.Columns.Count > 5)
+        while (RecordsGrid.Columns.Count > 6)
         {
             RecordsGrid.Columns.RemoveAt(RecordsGrid.Columns.Count - 1);
         }

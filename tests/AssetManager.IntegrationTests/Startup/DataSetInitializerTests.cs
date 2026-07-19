@@ -23,6 +23,7 @@ public sealed class DataSetInitializerTests
 
         Assert.True(result.CreatedInitialData);
         Assert.Equal(0, result.RecordCount);
+        Assert.Equal(365, result.LicenseWarningDays);
         Assert.True(Directory.Exists(paths.FixedAppRoot));
         Assert.True(Directory.Exists(paths.LogsDirectory));
         Assert.True(File.Exists(paths.BootstrapFile));
@@ -60,6 +61,7 @@ public sealed class DataSetInitializerTests
         var secondResult = await initializer.InitializeAsync();
 
         Assert.False(secondResult.CreatedInitialData);
+        Assert.Equal(42, secondResult.LicenseWarningDays);
         Assert.Equal(customized, await settingsRepository.LoadAsync(layout));
         Assert.False(File.Exists(staleHistory));
         Assert.True(Directory.Exists(layout.UndoDirectory));

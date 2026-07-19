@@ -28,7 +28,8 @@ public sealed record StartupResult(
     int RepairedValueCount,
     int ExcludedRecordCount,
     bool CreatedInitialData,
-    bool CheckPathsOnStartup);
+    bool CheckPathsOnStartup,
+    int LicenseWarningDays);
 
 public interface IStartupInitializer
 {

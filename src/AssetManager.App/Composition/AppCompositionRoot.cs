@@ -5,6 +5,7 @@ using AssetManager.Application.Data;
 using AssetManager.Application.Fields;
 using AssetManager.Application.GridEditing;
 using AssetManager.Application.Records;
+using AssetManager.Application.Settings;
 using AssetManager.Application.Startup;
 using AssetManager.Application.History;
 using AssetManager.Application.Paths;
@@ -79,6 +80,7 @@ internal static class AppCompositionRoot
             new PathRegistrationService(fileSystem, new WpfWindowsPathPicker()),
             new WindowsShellService(),
             new SearchConfigurationService(new JsonViewConfigurationStore(layout)),
+            new AppSettingsService(new JsonAppSettingsStore(layout)),
             () =>
             {
                 var window = new ManagementWindow
@@ -110,4 +112,5 @@ internal sealed record AppRuntimeServices(
     PathRegistrationService PathRegistration,
     IWindowsShellService Shell,
     SearchConfigurationService SearchConfiguration,
+    AppSettingsService Settings,
     Action ShowManagementWindow);

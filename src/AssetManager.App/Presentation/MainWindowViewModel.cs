@@ -7,6 +7,7 @@ using AssetManager.Application.Paths;
 using AssetManager.Application.Records;
 using AssetManager.Application.Search;
 using AssetManager.Application.Startup;
+using AssetManager.Domain.Licensing;
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
@@ -20,6 +21,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly AppRuntimeServices _runtime;
     private readonly IUserDialogService _dialogs;
     private readonly IClipboardService _clipboard;
+    private readonly LicenseWarningPolicy _licenseWarningPolicy;
     private readonly List<AssetRecord> _allRecords = [];
     private readonly Dictionary<FieldId, FieldDefinition> _definitions = [];
     private readonly Dictionary<AssetTypeId, string> _typeNames = [];
@@ -47,6 +49,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
         _clipboard = clipboard ?? throw new ArgumentNullException(nameof(clipboard));
+        _licenseWarningPolicy = new LicenseWarningPolicy(startupResult.LicenseWarningDays);
         DataRoot = startupResult.DataRoot;
         StartupSummary = startupResult.CreatedInitialData
             ? "初期データを作成し、利用準備が整いました。"
@@ -390,7 +393,14 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private RecordRowViewModel CreateRow(AssetRecord record)
     {
-        return new RecordRowViewModel(record, _typeNames, _tagNames, _definitions);
+        return new RecordRowViewModel(
+            record,
+            _typeNames,
+            _tagNames,
+            _definitions,
+            new AssetDate(DateOnly.FromDateTime(DateTime.Today)),
+            _licenseWarningPolicy,
+            _runtime.PathChecks.Cache);
     }
 
     private void BeginNewRecord()
@@ -825,6 +835,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 refreshCachedResults,
                 progress,
                 _pathCheckCancellation.Token);
+            ApplySearch();
             StatusMessage = result.IsCanceled
                 ? $"パス確認をキャンセルしました（未確認 {result.TotalCount - result.CheckedCount} 件）。"
                 : $"パス確認が完了しました（{result.CheckedCount} 件）。";
