@@ -1,6 +1,7 @@
 using AssetManager.App.Composition;
 using AssetManager.App.Presentation;
 using AssetManager.Application.Startup;
+using AssetManager.Application.History;
 using AssetManager.Infrastructure.Logging;
 using AssetManager.Infrastructure.Windows;
 using System.Diagnostics.CodeAnalysis;
@@ -20,6 +21,7 @@ public partial class App : System.Windows.Application
     private SingleInstanceCoordinator? _singleInstance;
     private RollingFileLogger? _logger;
     private Task? _activationListener;
+    private UndoRedoService? _undoRedo;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -55,6 +57,8 @@ public partial class App : System.Windows.Application
             var result = await services.StartupInitializer.InitializeAsync(
                 startupProgress,
                 _lifetimeCancellation.Token);
+            _undoRedo = AppCompositionRoot.CreateUndoRedoService(result);
+            await _undoRedo.InitializeAsync(_lifetimeCancellation.Token);
 
             var mainWindow = AppCompositionRoot.CreateMainWindow(result);
             MainWindow = mainWindow;
@@ -93,6 +97,20 @@ public partial class App : System.Windows.Application
             catch (AggregateException exception) when (
                 exception.InnerExceptions.All(item => item is OperationCanceledException))
             {
+            }
+        }
+
+        if (_undoRedo is not null)
+        {
+            try
+            {
+                _undoRedo.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch (Exception exception)
+            {
+                TryLogExceptionAsync(
+                    "アンドゥ履歴の終了処理に失敗しました。",
+                    exception).GetAwaiter().GetResult();
             }
         }
 

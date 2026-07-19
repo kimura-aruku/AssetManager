@@ -2,6 +2,7 @@ using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
 using AssetManager.Domain.Records;
+using AssetManager.Application.History;
 
 namespace AssetManager.Application.Data;
 
@@ -41,5 +42,10 @@ public interface IAssetManagerDataStore
     Task SaveTagsAsync(
         IReadOnlyList<TagCategoryDefinition> categories,
         IReadOnlyList<TagDefinition> tags,
+        CancellationToken cancellationToken = default);
+
+    Task ApplyDataChangeAsync(
+        UndoableDataChange change,
+        bool useAfter,
         CancellationToken cancellationToken = default);
 }

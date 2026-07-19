@@ -1,4 +1,5 @@
 using AssetManager.Application.Data;
+using AssetManager.Application.History;
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
@@ -75,6 +76,36 @@ internal sealed class TestDataStore(AssetManagerDataSnapshot snapshot) : IAssetM
         CancellationToken cancellationToken = default)
     {
         Snapshot = Snapshot with { TagCategories = categories, Tags = tags };
+        return Task.CompletedTask;
+    }
+
+    public Task ApplyDataChangeAsync(
+        UndoableDataChange change,
+        bool useAfter,
+        CancellationToken cancellationToken = default)
+    {
+        TransactionSaveCount++;
+        var fields = (useAfter ? change.FieldsAfter : change.FieldsBefore)
+            ?? Snapshot.FieldDefinitions;
+        var records = Snapshot.Records.ToDictionary(record => record.Id);
+        foreach (var recordChange in change.RecordChanges)
+        {
+            var record = useAfter ? recordChange.After : recordChange.Before;
+            if (record is null)
+            {
+                _ = records.Remove(recordChange.RecordId);
+            }
+            else
+            {
+                records[recordChange.RecordId] = record;
+            }
+        }
+
+        Snapshot = Snapshot with
+        {
+            FieldDefinitions = fields,
+            Records = records.Values.ToArray(),
+        };
         return Task.CompletedTask;
     }
 }

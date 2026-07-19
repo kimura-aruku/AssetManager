@@ -1,4 +1,5 @@
 using AssetManager.Application.Data;
+using AssetManager.Application.History;
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Common;
 using AssetManager.Domain.Fields;
@@ -13,13 +14,16 @@ public sealed class RecordApplicationService
 {
     private readonly IAssetManagerDataStore _store;
     private readonly TimeProvider _timeProvider;
+    private readonly UndoRedoService? _history;
 
     public RecordApplicationService(
         IAssetManagerDataStore store,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        UndoRedoService? history = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _history = history;
     }
 
     public async Task<IReadOnlyList<AssetRecord>> GetAllAsync(
@@ -50,7 +54,11 @@ public sealed class RecordApplicationService
             now);
         record = AssignTypesFromTargetFile(record, snapshot.FieldDefinitions, snapshot.AssetTypes, now);
         ValidateRecord(record, snapshot);
-        await _store.SaveRecordAsync(record, cancellationToken).ConfigureAwait(false);
+        await ApplyChangeAsync(
+            new UndoableDataChange(
+                "レコードを作成",
+                [new RecordStateChange(record.Id, null, record)]),
+            cancellationToken).ConfigureAwait(false);
         return record;
     }
 
@@ -67,7 +75,11 @@ public sealed class RecordApplicationService
         var updated = ApplyChanges(existing, changes, snapshot.FieldDefinitions, now);
         updated = AssignTypesFromTargetFile(updated, snapshot.FieldDefinitions, snapshot.AssetTypes, now);
         ValidateRecord(updated, snapshot);
-        await _store.SaveRecordAsync(updated, cancellationToken).ConfigureAwait(false);
+        await ApplyChangeAsync(
+            new UndoableDataChange(
+                "レコードを編集",
+                [new RecordStateChange(id, existing, updated)]),
+            cancellationToken).ConfigureAwait(false);
         return updated;
     }
 
@@ -81,7 +93,49 @@ public sealed class RecordApplicationService
             throw new KeyNotFoundException($"レコード'{id}'が見つかりません。");
         }
 
-        await _store.DeleteRecordAsync(id, cancellationToken).ConfigureAwait(false);
+        var existing = snapshot.Records.Single(record => record.Id == id);
+        await ApplyChangeAsync(
+            new UndoableDataChange(
+                "レコードを削除",
+                [new RecordStateChange(id, existing, null)]),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<AssetRecord>> UpdateManyAsync(
+        IReadOnlyDictionary<RecordId, IReadOnlyDictionary<FieldId, FieldValue?>> updates,
+        string description = "レコードを一括編集",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(updates);
+        ArgumentException.ThrowIfNullOrWhiteSpace(description);
+        if (updates.Count == 0)
+        {
+            return [];
+        }
+
+        var snapshot = await _store.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var recordMap = snapshot.Records.ToDictionary(record => record.Id);
+        var now = _timeProvider.GetUtcNow();
+        var changes = new List<RecordStateChange>(updates.Count);
+        var results = new List<AssetRecord>(updates.Count);
+        foreach (var (id, fieldChanges) in updates)
+        {
+            if (!recordMap.TryGetValue(id, out var existing))
+            {
+                throw new KeyNotFoundException($"レコード'{id}'が見つかりません。");
+            }
+
+            var updated = ApplyChanges(existing, fieldChanges, snapshot.FieldDefinitions, now);
+            updated = AssignTypesFromTargetFile(updated, snapshot.FieldDefinitions, snapshot.AssetTypes, now);
+            ValidateRecord(updated, snapshot);
+            changes.Add(new RecordStateChange(id, existing, updated));
+            results.Add(updated);
+        }
+
+        await ApplyChangeAsync(
+            new UndoableDataChange(description, changes),
+            cancellationToken).ConfigureAwait(false);
+        return results;
     }
 
     public static bool HasMissingTargetPath(AssetRecord record)
@@ -159,5 +213,14 @@ public sealed class RecordApplicationService
             throw new DomainValidationException(
                 string.Join(Environment.NewLine, result.Issues.Select(issue => issue.Message)));
         }
+    }
+
+    private Task ApplyChangeAsync(
+        UndoableDataChange change,
+        CancellationToken cancellationToken)
+    {
+        return _history is null
+            ? _store.ApplyDataChangeAsync(change, useAfter: true, cancellationToken)
+            : _history.ExecuteAsync(change, cancellationToken);
     }
 }

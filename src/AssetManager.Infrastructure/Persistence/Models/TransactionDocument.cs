@@ -10,7 +10,8 @@ public enum TransactionState
 
 public sealed record TransactionEntryDocument(
     string RelativePath,
-    bool ExistedBeforeTransaction);
+    bool ExistedBeforeTransaction,
+    bool DeleteTarget = false);
 
 public sealed record TransactionDocument(
     int SchemaVersion,

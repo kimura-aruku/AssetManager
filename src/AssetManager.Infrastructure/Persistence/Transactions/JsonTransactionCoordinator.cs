@@ -4,13 +4,21 @@ using AssetManager.Infrastructure.Persistence.Models;
 
 namespace AssetManager.Infrastructure.Persistence.Transactions;
 
-public sealed record JsonFileChange(string RelativePath, JsonElement Content)
+public sealed record JsonFileChange(
+    string RelativePath,
+    JsonElement? Content,
+    bool DeleteTarget = false)
 {
     public static JsonFileChange Create<T>(string relativePath, T content)
     {
         return new JsonFileChange(
             relativePath,
             JsonSerializer.SerializeToElement(content, JsonDefaults.Options));
+    }
+
+    public static JsonFileChange Delete(string relativePath)
+    {
+        return new JsonFileChange(relativePath, null, DeleteTarget: true);
     }
 }
 
@@ -69,7 +77,8 @@ public sealed class JsonTransactionCoordinator
 
         var entries = copiedChanges.Select(change => new TransactionEntryDocument(
             NormalizeRelativePath(change.RelativePath),
-            File.Exists(layout.ResolveRelativePath(change.RelativePath)))).ToArray();
+            File.Exists(layout.ResolveRelativePath(change.RelativePath)),
+            change.DeleteTarget)).ToArray();
         var state = TransactionState.Preparing;
 
         try
@@ -80,10 +89,15 @@ public sealed class JsonTransactionCoordinator
             for (var index = 0; index < copiedChanges.Length; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (copiedChanges[index].DeleteTarget)
+                {
+                    continue;
+                }
+
                 var stagedPath = ResolveTransactionPath(stagedRoot, entries[index].RelativePath);
                 await _store.SaveAsync(
                     stagedPath,
-                    copiedChanges[index].Content,
+                    copiedChanges[index].Content!.Value,
                     cancellationToken: cancellationToken).ConfigureAwait(false);
             }
 
@@ -107,9 +121,20 @@ public sealed class JsonTransactionCoordinator
             foreach (var entry in entries)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                _committer.Commit(
-                    ResolveTransactionPath(stagedRoot, entry.RelativePath),
-                    layout.ResolveRelativePath(entry.RelativePath));
+                var targetPath = layout.ResolveRelativePath(entry.RelativePath);
+                if (entry.DeleteTarget)
+                {
+                    if (File.Exists(targetPath))
+                    {
+                        File.Delete(targetPath);
+                    }
+                }
+                else
+                {
+                    _committer.Commit(
+                        ResolveTransactionPath(stagedRoot, entry.RelativePath),
+                        targetPath);
+                }
             }
 
             state = TransactionState.Committed;
@@ -215,6 +240,11 @@ public sealed class JsonTransactionCoordinator
         foreach (var change in changes)
         {
             _ = layout.ResolveRelativePath(change.RelativePath);
+            if (change.DeleteTarget != (change.Content is null))
+            {
+                throw new ArgumentException("削除変更にはJSON内容を指定できません。", nameof(changes));
+            }
+
             if (!paths.Add(NormalizeRelativePath(change.RelativePath)))
             {
                 throw new ArgumentException("同じファイルを複数回更新できません。", nameof(changes));

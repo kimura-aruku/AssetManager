@@ -1,5 +1,6 @@
 using System.Globalization;
 using AssetManager.Application.Data;
+using AssetManager.Application.History;
 using AssetManager.Domain.Common;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
@@ -22,13 +23,16 @@ public sealed class FieldApplicationService
 {
     private readonly IAssetManagerDataStore _store;
     private readonly TimeProvider _timeProvider;
+    private readonly UndoRedoService? _history;
 
     public FieldApplicationService(
         IAssetManagerDataStore store,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        UndoRedoService? history = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _history = history;
     }
 
     public async Task<FieldDefinition> AddCustomAsync(
@@ -152,14 +156,29 @@ public sealed class FieldApplicationService
 
         var now = _timeProvider.GetUtcNow();
         var definitions = snapshot.FieldDefinitions.Where(item => item.Id != id).ToArray();
-        var records = snapshot.Records
-            .Select(record => record.Values.ContainsKey(id) ? record.RemoveValue(id, now) : record)
+        var recordChanges = snapshot.Records
+            .Where(record => record.Values.ContainsKey(id))
+            .Select(record => new RecordStateChange(
+                record.Id,
+                record,
+                record.RemoveValue(id, now)))
             .ToArray();
-        await _store.SaveFieldsAndRecordsAsync(
+        var change = new UndoableDataChange(
+            "カスタムカラムを削除",
+            recordChanges,
             snapshot.FieldDefinitions,
-            definitions,
-            records,
-            cancellationToken).ConfigureAwait(false);
+            definitions);
+        if (_history is null)
+        {
+            await _store.ApplyDataChangeAsync(
+                change,
+                useAfter: true,
+                cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await _history.ExecuteAsync(change, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private async Task<FieldDefinition> UpdateDefinitionAsync(

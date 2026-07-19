@@ -59,6 +59,29 @@ public sealed class TransactionAndMigrationTests
     }
 
     [Fact]
+    public async Task TransactionDeletesFileAndRestoresItWhenLaterCommitFails()
+    {
+        using var temporary = new TemporaryDirectory();
+        var layout = new DataRootLayout(temporary.Path);
+        layout.EnsureDirectories();
+        var store = new AtomicJsonFileStore();
+        await store.SaveAsync(layout.SettingsFile, new TestDocument(1, "old-settings"));
+        await store.SaveAsync(layout.ViewsFile, new TestDocument(1, "old-views"));
+        var coordinator = new JsonTransactionCoordinator(store, new AlwaysFailingCommitter());
+
+        await Assert.ThrowsAsync<IOException>(() => coordinator.ExecuteAsync(
+            layout,
+            [
+                JsonFileChange.Delete("settings.json"),
+                JsonFileChange.Create("views.json", new TestDocument(1, "new-views")),
+            ]));
+
+        Assert.Equal("old-settings", (await store.ReadAsync<TestDocument>(layout.SettingsFile)).Value);
+        Assert.Equal("old-views", (await store.ReadAsync<TestDocument>(layout.ViewsFile)).Value);
+        Assert.Empty(Directory.EnumerateDirectories(layout.TransactionsDirectory));
+    }
+
+    [Fact]
     public async Task StartupRecoveryRollsBackApplyingTransaction()
     {
         using var temporary = new TemporaryDirectory();
@@ -138,6 +161,14 @@ public sealed class TransactionAndMigrationTests
             }
 
             _inner.Commit(stagedPath, targetPath);
+        }
+    }
+
+    private sealed class AlwaysFailingCommitter : ITransactionFileCommitter
+    {
+        public void Commit(string stagedPath, string targetPath)
+        {
+            throw new IOException("疑似コミット失敗");
         }
     }
 

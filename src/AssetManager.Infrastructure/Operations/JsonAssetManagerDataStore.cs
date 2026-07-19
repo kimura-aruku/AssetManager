@@ -1,4 +1,5 @@
 using AssetManager.Application.Data;
+using AssetManager.Application.History;
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
@@ -123,6 +124,47 @@ public sealed class JsonAssetManagerDataStore : IAssetManagerDataStore
         CancellationToken cancellationToken = default)
     {
         return _tags.SaveAsync(_layout, new TagCatalog(categories, tags), cancellationToken);
+    }
+
+    public async Task ApplyDataChangeAsync(
+        UndoableDataChange change,
+        bool useAfter,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        var currentDefinitions = await _fields.LoadAsync(_layout, cancellationToken).ConfigureAwait(false);
+        var targetDefinitions = (useAfter ? change.FieldsAfter : change.FieldsBefore)
+            ?? currentDefinitions;
+        var changes = new List<JsonFileChange>();
+
+        if (change.FieldsBefore is not null)
+        {
+            changes.Add(JsonFileChange.Create(
+                Path.GetRelativePath(_layout.RootDirectory, _layout.FieldsFile),
+                FieldDefinitionRepository.CreateDocument(targetDefinitions)));
+        }
+
+        foreach (var recordChange in change.RecordChanges)
+        {
+            var target = useAfter ? recordChange.After : recordChange.Before;
+            var path = RecordRepository.GetRecordPath(_layout, recordChange.RecordId);
+            var relativePath = Path.GetRelativePath(_layout.RootDirectory, path);
+            if (target is null)
+            {
+                changes.Add(JsonFileChange.Delete(relativePath));
+                continue;
+            }
+
+            var persisted = await WithUnknownValuesAsync(
+                target,
+                currentDefinitions,
+                cancellationToken).ConfigureAwait(false);
+            changes.Add(JsonFileChange.Create(
+                relativePath,
+                RecordRepository.CreateDocument(persisted)));
+        }
+
+        _ = await _transactions.ExecuteAsync(_layout, changes, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<PersistedAssetRecord> WithUnknownValuesAsync(
