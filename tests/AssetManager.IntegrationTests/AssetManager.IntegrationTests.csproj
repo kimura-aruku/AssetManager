@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\AssetManager.App\AssetManager.App.csproj" />
     <ProjectReference Include="..\..\src\AssetManager.Application\AssetManager.Application.csproj" />
     <ProjectReference Include="..\..\src\AssetManager.Domain\AssetManager.Domain.csproj" />
     <ProjectReference Include="..\..\src\AssetManager.Infrastructure\AssetManager.Infrastructure.csproj" />

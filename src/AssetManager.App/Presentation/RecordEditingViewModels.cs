@@ -163,6 +163,28 @@ public sealed class FieldEditorViewModel : ObservableObject
 
     public ObservableCollection<SelectableOptionViewModel> Options { get; }
 
+    public void ReplaceOptions(IEnumerable<SelectableOptionViewModel> options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var selectedIds = Options
+            .Where(option => option.IsSelected)
+            .Select(option => option.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var option in Options)
+        {
+            option.PropertyChanged -= OnOptionPropertyChanged;
+        }
+
+        Options.Clear();
+        foreach (var option in options)
+        {
+            option.IsSelected = selectedIds.Contains(option.Id);
+            option.PropertyChanged += OnOptionPropertyChanged;
+            Options.Add(option);
+        }
+    }
+
     public bool IsBoolean => Definition.Type == FieldType.Boolean;
 
     public bool IsSingleOption => Definition.Type is FieldType.SingleSelect or FieldType.RecordStatus;

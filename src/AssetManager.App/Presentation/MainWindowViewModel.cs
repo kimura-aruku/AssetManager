@@ -720,16 +720,40 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private async Task ShowManagementAsync()
     {
+        var selectedRecordId = SelectedRecord?.Record.Id;
+        var wasDraft = _isDraft;
         _runtime.ShowManagementWindow();
         try
         {
             await ReloadSnapshotAsync();
-            SelectedRecord = null;
             ApplySearch();
+            if (selectedRecordId is { } id)
+            {
+                SelectedRecord = Records.FirstOrDefault(row => row.Record.Id == id);
+            }
+            else if (wasDraft)
+            {
+                RefreshDetailFieldOptions();
+            }
+            else
+            {
+                SelectedRecord = null;
+            }
         }
         catch (Exception exception)
         {
             _dialogs.ShowError($"管理画面の変更を再読み込みできませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
+        }
+    }
+
+    private void RefreshDetailFieldOptions()
+    {
+        foreach (var editor in DetailFields)
+        {
+            var searchField = SearchFields.FirstOrDefault(field => field.Definition.Id == editor.Definition.Id);
+            var options = searchField?.Options.Select(
+                option => new SelectableOptionViewModel(option.Id, option.Label)) ?? [];
+            editor.ReplaceOptions(options);
         }
     }
 
