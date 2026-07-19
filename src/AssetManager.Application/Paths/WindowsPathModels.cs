@@ -77,6 +77,8 @@ public interface IWindowsShellService
 {
     void Open(string path);
 
+    void OpenWebUrl(string url);
+
     void ShowInExplorer(string path, PathEntryKind kind);
 }
 

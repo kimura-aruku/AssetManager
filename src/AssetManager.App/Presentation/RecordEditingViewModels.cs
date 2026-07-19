@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using System.Windows.Input;
 using AssetManager.Application.Search;
 using AssetManager.Application.Status;
 using AssetManager.Domain.Catalog;
@@ -122,6 +123,30 @@ public sealed class SearchFieldViewModel : ObservableObject
     }
 }
 
+public sealed class FieldEditorEntryViewModel : ObservableObject
+{
+    private string _primaryText;
+    private string _secondaryText;
+
+    public FieldEditorEntryViewModel(string primaryText = "", string secondaryText = "")
+    {
+        _primaryText = primaryText;
+        _secondaryText = secondaryText;
+    }
+
+    public string PrimaryText
+    {
+        get => _primaryText;
+        set => SetProperty(ref _primaryText, value);
+    }
+
+    public string SecondaryText
+    {
+        get => _secondaryText;
+        set => SetProperty(ref _secondaryText, value);
+    }
+}
+
 public sealed class FieldEditorViewModel : ObservableObject
 {
     private string _text = string.Empty;
@@ -145,6 +170,8 @@ public sealed class FieldEditorViewModel : ObservableObject
             option.PropertyChanged += OnOptionPropertyChanged;
         }
 
+        AddListEntryCommand = new RelayCommand(AddListEntry, () => IsList);
+        RemoveListEntryCommand = new RelayCommand(RemoveListEntry, () => IsList && Entries.Count > 1);
         Load(value);
     }
 
@@ -152,16 +179,13 @@ public sealed class FieldEditorViewModel : ObservableObject
 
     public string Label => Definition.Id == BuiltInFieldIds.TargetPath ? "パス" : Definition.Label;
 
-    public string? Hint => Definition.Type switch
-    {
-        FieldType.Date => "YYYY/MM/DD",
-        FieldType.StringList => "1行に1件",
-        FieldType.TitledPathList => "1行に『タイトル | パス』",
-        FieldType.TitledUrlList => "1行に『タイトル | URL』",
-        _ => null,
-    };
-
     public ObservableCollection<SelectableOptionViewModel> Options { get; }
+
+    public ObservableCollection<FieldEditorEntryViewModel> Entries { get; } = [];
+
+    public ICommand AddListEntryCommand { get; }
+
+    public ICommand RemoveListEntryCommand { get; }
 
     public void ReplaceOptions(IEnumerable<SelectableOptionViewModel> options)
     {
@@ -195,6 +219,26 @@ public sealed class FieldEditorViewModel : ObservableObject
 
     public bool IsTargetPath => Definition.Type == FieldType.TargetPath;
 
+    public bool IsFilePath => Definition.Type == FieldType.FilePath;
+
+    public bool IsFolderPath => Definition.Type == FieldType.FolderPath;
+
+    public bool IsAuxiliaryPath => IsFilePath || IsFolderPath;
+
+    public bool IsUrl => Definition.Type == FieldType.Url;
+
+    public bool IsStringList => Definition.Type == FieldType.StringList;
+
+    public bool IsTitledPathList => Definition.Type == FieldType.TitledPathList;
+
+    public bool IsTitledUrlList => Definition.Type == FieldType.TitledUrlList;
+
+    public bool IsTitledList => IsTitledPathList || IsTitledUrlList;
+
+    public bool IsList => IsStringList || IsTitledList;
+
+    public bool IsNonBoolean => !IsBoolean;
+
     public bool IsDate => Definition.Type == FieldType.Date;
 
     public bool IsNumber => Definition.Type == FieldType.Number;
@@ -207,12 +251,12 @@ public sealed class FieldEditorViewModel : ObservableObject
         && !IsSingleOption
         && !IsMultiOption
         && !IsDate
-        && !IsNumber;
+        && !IsNumber
+        && !IsList;
 
-    public bool AcceptsMultipleLines => Definition.Type is FieldType.MultilineText
-        or FieldType.StringList
-        or FieldType.TitledPathList
-        or FieldType.TitledUrlList;
+    public bool IsPlainText => IsText && !IsUrl && !IsAuxiliaryPath && !IsTargetPath;
+
+    public bool AcceptsMultipleLines => Definition.Type == FieldType.MultilineText;
 
     public string Text
     {
@@ -223,6 +267,7 @@ public sealed class FieldEditorViewModel : ObservableObject
             {
                 MarkDirty();
                 ValidatePreview();
+                RelayCommand.RefreshCanExecute();
             }
         }
     }
@@ -330,6 +375,43 @@ public sealed class FieldEditorViewModel : ObservableObject
                 : new DateFieldValue(new AssetDate(DateOnly.FromDateTime(SelectedDate.Value)));
         }
 
+        if (IsStringList)
+        {
+            var values = Entries
+                .Select(entry => entry.PrimaryText.Trim())
+                .Where(value => value.Length > 0)
+                .ToArray();
+            if (values.Length == 0)
+            {
+                return null;
+            }
+
+            return Definition.SystemRole switch
+            {
+                SystemRole.Creators => new CreatorListFieldValue(values),
+                SystemRole.Sellers => new SellerListFieldValue(values),
+                _ => throw new DomainValidationException($"カラム'{Label}'の入力形式に対応していません。"),
+            };
+        }
+
+        if (IsTitledPathList)
+        {
+            var values = CreateTitledEntries();
+            return values.Length == 0
+                ? null
+                : new RelatedDocumentListFieldValue(
+                    values.Select(item => new RelatedDocument(item.Title, item.Value)));
+        }
+
+        if (IsTitledUrlList)
+        {
+            var values = CreateTitledEntries();
+            return values.Length == 0
+                ? null
+                : new RelatedUrlListFieldValue(
+                    values.Select(item => new RelatedUrl(item.Title, item.Value)));
+        }
+
         if (trimmed.Length == 0)
         {
             return null;
@@ -344,14 +426,6 @@ public sealed class FieldEditorViewModel : ObservableObject
             FieldType.FilePath => new FilePathFieldValue(trimmed),
             FieldType.FolderPath => new FolderPathFieldValue(trimmed),
             FieldType.TargetPath => new TargetPathFieldValue(TargetPathKind, trimmed),
-            FieldType.StringList when Definition.SystemRole == SystemRole.Creators =>
-                new CreatorListFieldValue(ParseLines(Text)),
-            FieldType.StringList when Definition.SystemRole == SystemRole.Sellers =>
-                new SellerListFieldValue(ParseLines(Text)),
-            FieldType.TitledPathList => new RelatedDocumentListFieldValue(
-                ParseTitledLines(Text).Select(item => new RelatedDocument(item.Title, item.Value))),
-            FieldType.TitledUrlList => new RelatedUrlListFieldValue(
-                ParseTitledLines(Text).Select(item => new RelatedUrl(item.Title, item.Value))),
             _ => throw new DomainValidationException($"カラム'{Label}'の入力形式に対応していません。"),
         };
     }
@@ -374,6 +448,7 @@ public sealed class FieldEditorViewModel : ObservableObject
                 ? date.Value.Value.ToDateTime(TimeOnly.MinValue)
                 : null;
             TargetPathKind = value is TargetPathFieldValue target ? target.Kind : TargetPathKind.File;
+            LoadListEntries(value);
 
             var selectedIds = value switch
             {
@@ -403,6 +478,85 @@ public sealed class FieldEditorViewModel : ObservableObject
         }
     }
 
+    private void OnEntryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        MarkDirty();
+        ValidatePreview();
+        RelayCommand.RefreshCanExecute();
+    }
+
+    private void AddListEntry()
+    {
+        AddListEntryCore(new FieldEditorEntryViewModel());
+        MarkDirty();
+        RelayCommand.RefreshCanExecute();
+    }
+
+    private void RemoveListEntry()
+    {
+        if (Entries.Count <= 1)
+        {
+            return;
+        }
+
+        var entry = Entries[^1];
+        entry.PropertyChanged -= OnEntryPropertyChanged;
+        Entries.RemoveAt(Entries.Count - 1);
+        MarkDirty();
+        ValidatePreview();
+        RelayCommand.RefreshCanExecute();
+    }
+
+    private void LoadListEntries(FieldValue? value)
+    {
+        foreach (var entry in Entries)
+        {
+            entry.PropertyChanged -= OnEntryPropertyChanged;
+        }
+
+        Entries.Clear();
+        switch (value)
+        {
+            case CreatorListFieldValue creators:
+                foreach (var creator in creators.Values)
+                {
+                    AddListEntryCore(new FieldEditorEntryViewModel(creator));
+                }
+                break;
+            case SellerListFieldValue sellers:
+                foreach (var seller in sellers.Values)
+                {
+                    AddListEntryCore(new FieldEditorEntryViewModel(seller));
+                }
+                break;
+            case RelatedDocumentListFieldValue documents:
+                foreach (var document in documents.Values)
+                {
+                    AddListEntryCore(new FieldEditorEntryViewModel(document.Title, document.Path));
+                }
+                break;
+            case RelatedUrlListFieldValue urls:
+                foreach (var url in urls.Values)
+                {
+                    AddListEntryCore(new FieldEditorEntryViewModel(url.Title, url.Url));
+                }
+                break;
+        }
+
+        if (IsList && Entries.Count == 0)
+        {
+            AddListEntryCore(new FieldEditorEntryViewModel());
+        }
+
+        RelayCommand.RefreshCanExecute();
+    }
+
+    private void AddListEntryCore(FieldEditorEntryViewModel entry)
+    {
+        entry.PropertyChanged += OnEntryPropertyChanged;
+        Entries.Add(entry);
+    }
+
     private void MarkDirty()
     {
         if (!_isLoading)
@@ -415,7 +569,7 @@ public sealed class FieldEditorViewModel : ObservableObject
     {
         var text = Text.Trim();
         Warning = null;
-        if (text.Length == 0)
+        if (text.Length == 0 && !IsList)
         {
             return;
         }
@@ -447,6 +601,13 @@ public sealed class FieldEditorViewModel : ObservableObject
         {
             Warning = "ローカルドライブの絶対パスを入力してください。";
         }
+
+        else if (IsTitledPathList
+                 && Entries.Any(entry => !string.IsNullOrWhiteSpace(entry.SecondaryText)
+                     && !System.IO.Path.IsPathFullyQualified(entry.SecondaryText.Trim())))
+        {
+            Warning = "各パスにはローカルドライブの絶対パスを入力してください。";
+        }
     }
 
     private static decimal ParseNumber(string value)
@@ -460,23 +621,18 @@ public sealed class FieldEditorViewModel : ObservableObject
         throw new DomainValidationException("数値を入力してください。", nameof(value));
     }
 
-    private static string[] ParseLines(string value)
+    private (string Title, string Value)[] CreateTitledEntries()
     {
-        return value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-    }
-
-    private static IEnumerable<(string Title, string Value)> ParseTitledLines(string value)
-    {
-        foreach (var line in ParseLines(value))
+        var entries = Entries
+            .Select(entry => (Title: entry.PrimaryText.Trim(), Value: entry.SecondaryText.Trim()))
+            .Where(entry => entry.Title.Length > 0 || entry.Value.Length > 0)
+            .ToArray();
+        if (entries.Any(entry => entry.Title.Length == 0 || entry.Value.Length == 0))
         {
-            var parts = line.Split('|', 2, StringSplitOptions.TrimEntries);
-            if (parts.Length != 2 || parts.Any(string.IsNullOrWhiteSpace))
-            {
-                throw new DomainValidationException("各行を『タイトル | 値』の形式で入力してください。", nameof(value));
-            }
-
-            yield return (parts[0], parts[1]);
+            throw new DomainValidationException("タイトルと値を両方入力してください。", nameof(Entries));
         }
+
+        return entries;
     }
 }
 

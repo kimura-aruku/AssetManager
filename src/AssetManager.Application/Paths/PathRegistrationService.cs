@@ -72,6 +72,20 @@ public sealed class PathRegistrationService
         return path is null ? null : RegisterTarget(path);
     }
 
+    public AuxiliaryPathRegistration? PickAuxiliaryFile(string title)
+    {
+        EnsurePicker();
+        var path = _picker!.PickFile(title);
+        return path is null ? null : RegisterAuxiliary(path, PathEntryKind.File);
+    }
+
+    public AuxiliaryPathRegistration? PickAuxiliaryFolder(string title)
+    {
+        EnsurePicker();
+        var path = _picker!.PickFolder(title);
+        return path is null ? null : RegisterAuxiliary(path, PathEntryKind.Folder);
+    }
+
     private string ValidateLocalFixedPath(string input)
     {
         var path = WindowsPathNormalizer.NormalizeForStorage(input);

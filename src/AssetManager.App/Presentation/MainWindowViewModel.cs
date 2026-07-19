@@ -73,6 +73,16 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             () => _selectedGridRows.Count > 0 && _selectedGridFields.Count > 0);
         PickTargetFileCommand = new RelayCommand(() => PickTarget(isFolder: false));
         PickTargetFolderCommand = new RelayCommand(() => PickTarget(isFolder: true));
+        PickFieldPathCommand = new RelayCommand<FieldEditorViewModel>(
+            PickFieldPath,
+            editor => editor.IsAuxiliaryPath);
+        PickListPathCommand = new RelayCommand<FieldEditorEntryViewModel>(PickListPath);
+        OpenFieldUrlCommand = new RelayCommand<FieldEditorViewModel>(
+            OpenFieldUrl,
+            editor => editor.IsUrl && !string.IsNullOrWhiteSpace(editor.Text));
+        OpenListUrlCommand = new RelayCommand<FieldEditorEntryViewModel>(
+            OpenListUrl,
+            entry => !string.IsNullOrWhiteSpace(entry.SecondaryText));
         OpenTargetCommand = new RelayCommand(OpenTarget, HasSelectedTarget);
         ShowTargetInExplorerCommand = new RelayCommand(ShowTargetInExplorer, HasSelectedTarget);
         ShowRowTargetInExplorerCommand = new RelayCommand<RecordRowViewModel>(
@@ -192,6 +202,14 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     public ICommand PickTargetFileCommand { get; }
 
     public ICommand PickTargetFolderCommand { get; }
+
+    public ICommand PickFieldPathCommand { get; }
+
+    public ICommand PickListPathCommand { get; }
+
+    public ICommand OpenFieldUrlCommand { get; }
+
+    public ICommand OpenListUrlCommand { get; }
 
     public ICommand OpenTargetCommand { get; }
 
@@ -671,6 +689,54 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void PickFieldPath(FieldEditorViewModel editor)
+    {
+        try
+        {
+            var registration = editor.IsFolderPath
+                ? _runtime.PathRegistration.PickAuxiliaryFolder($"{editor.Label}を選択")
+                : _runtime.PathRegistration.PickAuxiliaryFile($"{editor.Label}を選択");
+            if (registration is not null)
+            {
+                editor.Text = registration.Path;
+            }
+        }
+        catch (Exception exception)
+        {
+            _dialogs.ShowError($"パスを選択できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
+        }
+    }
+
+    private void PickListPath(FieldEditorEntryViewModel entry)
+    {
+        try
+        {
+            var registration = _runtime.PathRegistration.PickAuxiliaryFile("関連文書を選択");
+            if (registration is not null)
+            {
+                entry.SecondaryText = registration.Path;
+            }
+        }
+        catch (Exception exception)
+        {
+            _dialogs.ShowError($"関連文書を選択できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
+        }
+    }
+
+    private void OpenFieldUrl(FieldEditorViewModel editor)
+    {
+        TryShellAction(
+            () => _runtime.Shell.OpenWebUrl(editor.Text.Trim()),
+            "URLを開けませんでした。");
+    }
+
+    private void OpenListUrl(FieldEditorEntryViewModel entry)
+    {
+        TryShellAction(
+            () => _runtime.Shell.OpenWebUrl(entry.SecondaryText.Trim()),
+            "URLを開けませんでした。");
+    }
+
     private void ApplyFileSelectionDefaults(TargetPathFieldValue path)
     {
         var defaults = FileSelectionDefaultProvider.Create(path.Path, path.Kind, _assetTypes);
@@ -728,13 +794,18 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private void TryShellAction(Action action)
     {
+        TryShellAction(action, "Windowsでパスを開けませんでした。");
+    }
+
+    private void TryShellAction(Action action, string errorMessage)
+    {
         try
         {
             action();
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"Windowsでパスを開けませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
+            _dialogs.ShowError($"{errorMessage}{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 

@@ -161,6 +161,18 @@ public partial class MainWindow : Window
         UpdateViewModelSelection();
     }
 
+    private void OnTargetPathSelectClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { ContextMenu: { } menu } button)
+        {
+            return;
+        }
+
+        menu.PlacementTarget = button;
+        menu.Placement = PlacementMode.Bottom;
+        menu.IsOpen = true;
+    }
+
     private void UpdateViewModelSelection()
     {
         if (DataContext is not MainWindowViewModel viewModel)

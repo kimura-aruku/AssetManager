@@ -96,6 +96,23 @@ public sealed class WindowsPathTests
         Assert.Null(service.PickTargetFile());
     }
 
+    [Fact]
+    public void AuxiliaryPickerReturnsNormalizedSelectedPath()
+    {
+        var fileSystem = new FakeFileSystem
+        {
+            ExistingKinds = { [@"C:\Assets\receipt.pdf"] = PathEntryKind.File },
+        };
+        var picker = new FakePicker { FileResult = @"c:/Assets/receipt.pdf" };
+        var service = new PathRegistrationService(fileSystem, picker);
+
+        var result = service.PickAuxiliaryFile("領収書を選択");
+
+        Assert.NotNull(result);
+        Assert.Equal(@"C:\Assets\receipt.pdf", result.Path);
+        Assert.Equal(PathEntryKind.File, result.ExpectedKind);
+    }
+
     private sealed class FakePicker : IWindowsPathPicker
     {
         public string? FileResult { get; set; }

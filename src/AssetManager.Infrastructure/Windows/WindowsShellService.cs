@@ -18,6 +18,21 @@ public sealed class WindowsShellService : IWindowsShellService
         });
     }
 
+    public void OpenWebUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new ArgumentException("HTTPまたはHTTPSのURLを指定してください。", nameof(url));
+        }
+
+        _ = Process.Start(new ProcessStartInfo
+        {
+            FileName = uri.AbsoluteUri,
+            UseShellExecute = true,
+        });
+    }
+
     public void ShowInExplorer(string path, PathEntryKind kind)
     {
         var normalized = WindowsPathNormalizer.NormalizeForStorage(path);

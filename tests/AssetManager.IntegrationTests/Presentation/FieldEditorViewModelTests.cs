@@ -1,5 +1,6 @@
 using AssetManager.App.Presentation;
 using AssetManager.Domain.Fields;
+using AssetManager.Domain.Values;
 
 namespace AssetManager.IntegrationTests.Presentation;
 
@@ -40,5 +41,63 @@ public sealed class FieldEditorViewModelTests
         Assert.True(editor.Options.Single(option => option.Id == "tag.selected").IsSelected);
         Assert.False(editor.Options.Single(option => option.Id == "tag.added").IsSelected);
         Assert.True(editor.IsDirty);
+    }
+
+    [Fact]
+    public void リスト入力は空の1行から開始し0行にはできない()
+    {
+        var definition = BuiltInFieldCatalog.All.Single(field => field.Id == BuiltInFieldIds.Creators);
+        var editor = new FieldEditorViewModel(definition, value: null);
+
+        Assert.Single(editor.Entries);
+        Assert.False(editor.RemoveListEntryCommand.CanExecute(null));
+
+        editor.AddListEntryCommand.Execute(null);
+        Assert.Equal(2, editor.Entries.Count);
+        Assert.True(editor.RemoveListEntryCommand.CanExecute(null));
+
+        editor.RemoveListEntryCommand.Execute(null);
+        Assert.Single(editor.Entries);
+        Assert.False(editor.RemoveListEntryCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void 制作者は入力欄ごとの値として保存する()
+    {
+        var definition = BuiltInFieldCatalog.All.Single(field => field.Id == BuiltInFieldIds.Creators);
+        var editor = new FieldEditorViewModel(
+            definition,
+            new CreatorListFieldValue(["制作者A", "制作者B"]));
+
+        Assert.Equal(["制作者A", "制作者B"], editor.Entries.Select(entry => entry.PrimaryText));
+
+        editor.Entries[1].PrimaryText = "制作者C";
+        var value = Assert.IsType<CreatorListFieldValue>(editor.CreateValue());
+        Assert.Equal(["制作者A", "制作者C"], value.Values);
+    }
+
+    [Fact]
+    public void 関連文書と関連URLはタイトルと値を行単位で保存する()
+    {
+        var documentDefinition = BuiltInFieldCatalog.All.Single(
+            field => field.Id == BuiltInFieldIds.RelatedDocuments);
+        var documentEditor = new FieldEditorViewModel(documentDefinition, value: null);
+        documentEditor.Entries[0].PrimaryText = "利用規約";
+        documentEditor.Entries[0].SecondaryText = @"C:\Assets\license.txt";
+
+        var documents = Assert.IsType<RelatedDocumentListFieldValue>(documentEditor.CreateValue());
+        var document = Assert.Single(documents.Values);
+        Assert.Equal("利用規約", document.Title);
+        Assert.Equal(@"C:\Assets\license.txt", document.Path);
+
+        var urlDefinition = BuiltInFieldCatalog.All.Single(field => field.Id == BuiltInFieldIds.RelatedUrls);
+        var urlEditor = new FieldEditorViewModel(urlDefinition, value: null);
+        urlEditor.Entries[0].PrimaryText = "商品ページ";
+        urlEditor.Entries[0].SecondaryText = "https://example.invalid/product";
+
+        var urls = Assert.IsType<RelatedUrlListFieldValue>(urlEditor.CreateValue());
+        var url = Assert.Single(urls.Values);
+        Assert.Equal("商品ページ", url.Title);
+        Assert.Equal("https://example.invalid/product", url.Url);
     }
 }
