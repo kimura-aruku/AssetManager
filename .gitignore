@@ -6,6 +6,7 @@ Desktop.ini
 # Editors and IDEs
 .idea/
 .vscode/
+.vs/
 *.swp
 *.swo
 
@@ -20,9 +21,8 @@ logs/
 tmp/
 temp/
 
-# Local agent instructions and task management
+# Local agent instructions
 AGENTS.md
-TASK.md
 
 # Dependencies and generated outputs
 node_modules/
@@ -30,6 +30,7 @@ dist/
 build/
 out/
 coverage/
+TestResults/
 bin/
 obj/
 target/
