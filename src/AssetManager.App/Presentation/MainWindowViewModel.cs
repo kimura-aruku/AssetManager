@@ -111,6 +111,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<FieldEditorViewModel> DetailFields { get; } = [];
 
+    public ObservableCollection<FieldEditorViewModel> LicenseConditionFields { get; } = [];
+
     public ObservableCollection<DisplayColumnOptionViewModel> DisplayColumns { get; } = [];
 
     public ObservableCollection<SavedSearch> SavedSearches { get; } = [];
@@ -447,6 +449,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private void LoadEditors(AssetRecord? record)
     {
         DetailFields.Clear();
+        LicenseConditionFields.Clear();
         if (record is null && !_isDraft)
         {
             return;
@@ -460,10 +463,20 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             var searchField = SearchFields.FirstOrDefault(field => field.Definition.Id == definition.Id);
             var options = searchField?.Options.Select(option => new SelectableOptionViewModel(option.Id, option.Label));
-            DetailFields.Add(new FieldEditorViewModel(
+            var editor = new FieldEditorViewModel(
                 definition,
                 record?.Values.GetValueOrDefault(definition.Id),
-                options));
+                options);
+            DetailFields.Add(editor);
+            if (editor.IsLicenseCondition)
+            {
+                LicenseConditionFields.Add(editor);
+            }
+        }
+
+        if (LicenseConditionFields.Count > 0)
+        {
+            LicenseConditionFields[0].ShowLicenseConditionGroup();
         }
     }
 

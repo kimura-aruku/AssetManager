@@ -100,4 +100,44 @@ public sealed class FieldEditorViewModelTests
         Assert.Equal("商品ページ", url.Title);
         Assert.Equal("https://example.invalid/product", url.Url);
     }
+
+    [Fact]
+    public void 種類とその他の複数選択を別レイアウトとして識別する()
+    {
+        var typeDefinition = BuiltInFieldCatalog.All.Single(
+            field => field.Id == BuiltInFieldIds.AssetTypes);
+        var tagDefinition = BuiltInFieldCatalog.All.Single(
+            field => field.Id == BuiltInFieldIds.Tags);
+
+        var typeEditor = new FieldEditorViewModel(typeDefinition, value: null);
+        var tagEditor = new FieldEditorViewModel(tagDefinition, value: null);
+
+        Assert.True(typeEditor.IsAssetTypeSet);
+        Assert.False(typeEditor.IsOtherMultiOption);
+        Assert.False(tagEditor.IsAssetTypeSet);
+        Assert.True(tagEditor.IsOtherMultiOption);
+    }
+
+    [Fact]
+    public void ライセンス条件をグループ表示対象として識別する()
+    {
+        var licenseEditors = BuiltInFieldCatalog.All
+            .Select(definition => new FieldEditorViewModel(definition, value: null))
+            .Where(editor => editor.IsLicenseCondition)
+            .ToArray();
+        var favoriteDefinition = BuiltInFieldCatalog.All.Single(
+            field => field.Id == BuiltInFieldIds.Favorite);
+        var favoriteEditor = new FieldEditorViewModel(favoriteDefinition, value: null);
+
+        Assert.Equal(10, licenseEditors.Length);
+        Assert.All(licenseEditors, editor => Assert.False(editor.IsStandaloneBoolean));
+        Assert.False(licenseEditors[0].IsDetailItemVisible);
+
+        licenseEditors[0].ShowLicenseConditionGroup();
+
+        Assert.True(licenseEditors[0].ShowsLicenseConditionGroup);
+        Assert.True(licenseEditors[0].IsDetailItemVisible);
+        Assert.True(favoriteEditor.IsStandaloneBoolean);
+        Assert.True(favoriteEditor.IsDetailItemVisible);
+    }
 }

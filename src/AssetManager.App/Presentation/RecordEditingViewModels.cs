@@ -157,6 +157,7 @@ public sealed class FieldEditorViewModel : ObservableObject
     private string? _warning;
     private bool _isDirty;
     private bool _isLoading;
+    private bool _showsLicenseConditionGroup;
 
     public FieldEditorViewModel(
         FieldDefinition definition,
@@ -217,6 +218,28 @@ public sealed class FieldEditorViewModel : ObservableObject
         or FieldType.AssetTypeSet
         or FieldType.TagSet;
 
+    public bool IsAssetTypeSet => Definition.Type == FieldType.AssetTypeSet;
+
+    public bool IsOtherMultiOption => IsMultiOption && !IsAssetTypeSet;
+
+    public bool IsLicenseCondition => Definition.SystemRole is
+        SystemRole.CreditRequired
+        or SystemRole.LinkRequired
+        or SystemRole.LogoRequired
+        or SystemRole.CommercialUseAllowed
+        or SystemRole.ModificationAllowed
+        or SystemRole.RedistributionAllowed
+        or SystemRole.AdultUseAllowed
+        or SystemRole.GenerativeAiUseAllowed
+        or SystemRole.LicenseUnknown
+        or SystemRole.LicenseNeedsReview;
+
+    public bool IsStandaloneBoolean => IsBoolean && !IsLicenseCondition;
+
+    public bool ShowsLicenseConditionGroup => _showsLicenseConditionGroup;
+
+    public bool IsDetailItemVisible => !IsLicenseCondition || ShowsLicenseConditionGroup;
+
     public bool IsTargetPath => Definition.Type == FieldType.TargetPath;
 
     public bool IsFilePath => Definition.Type == FieldType.FilePath;
@@ -257,6 +280,14 @@ public sealed class FieldEditorViewModel : ObservableObject
     public bool IsPlainText => IsText && !IsUrl && !IsAuxiliaryPath && !IsTargetPath;
 
     public bool AcceptsMultipleLines => Definition.Type == FieldType.MultilineText;
+
+    public void ShowLicenseConditionGroup()
+    {
+        if (SetProperty(ref _showsLicenseConditionGroup, true, nameof(ShowsLicenseConditionGroup)))
+        {
+            OnPropertyChanged(nameof(IsDetailItemVisible));
+        }
+    }
 
     public string Text
     {

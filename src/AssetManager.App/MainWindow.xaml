@@ -375,21 +375,56 @@
             <ItemsControl ItemsSource="{Binding DetailFields}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <StackPanel Margin="0,0,4,14">
+                  <StackPanel Margin="0,0,4,14"
+                              Visibility="{Binding IsDetailItemVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <TextBlock Margin="0,0,0,4"
                                FontWeight="SemiBold"
                                Text="{Binding Label}"
                                Visibility="{Binding IsNonBoolean, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <CheckBox Margin="0"
-                              Visibility="{Binding IsBoolean, Converter={StaticResource BooleanToVisibilityConverter}}"
+                              Visibility="{Binding IsStandaloneBoolean, Converter={StaticResource BooleanToVisibilityConverter}}"
                               IsChecked="{Binding BooleanValue}"
                               Content="{Binding Label}" />
+                    <StackPanel Visibility="{Binding ShowsLicenseConditionGroup, Converter={StaticResource BooleanToVisibilityConverter}}">
+                      <TextBlock Margin="0,0,0,4"
+                                 FontWeight="SemiBold"
+                                 Text="ライセンス条件" />
+                      <ItemsControl ItemsSource="{Binding DataContext.LicenseConditionFields, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <UniformGrid Columns="2" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <CheckBox Margin="0,2,8,2"
+                                      Content="{Binding Label}"
+                                      IsChecked="{Binding BooleanValue}" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
                     <ComboBox Visibility="{Binding IsSingleOption, Converter={StaticResource BooleanToVisibilityConverter}}"
                               ItemsSource="{Binding Options}"
                               DisplayMemberPath="Label"
                               SelectedValuePath="Id"
                               SelectedValue="{Binding SelectedOptionId}" />
-                    <ItemsControl Visibility="{Binding IsMultiOption, Converter={StaticResource BooleanToVisibilityConverter}}"
+                    <ItemsControl Visibility="{Binding IsAssetTypeSet, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                  ItemsSource="{Binding Options}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <UniformGrid Columns="3" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <CheckBox Margin="0,2,8,2"
+                                    Content="{Binding Label}"
+                                    IsChecked="{Binding IsSelected}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl Visibility="{Binding IsOtherMultiOption, Converter={StaticResource BooleanToVisibilityConverter}}"
                                   ItemsSource="{Binding Options}">
                       <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
