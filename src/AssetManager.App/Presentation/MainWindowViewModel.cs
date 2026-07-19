@@ -662,12 +662,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private void ApplyFileSelectionDefaults(TargetPathFieldValue path)
     {
-        if (path.Kind != TargetPathKind.File)
-        {
-            return;
-        }
-
-        var defaults = FileSelectionDefaultProvider.Create(path.Path, _assetTypes);
+        var defaults = FileSelectionDefaultProvider.Create(path.Path, path.Kind, _assetTypes);
         var nameEditor = DetailFields.Single(field => field.Definition.Id == BuiltInFieldIds.Name);
         if (string.IsNullOrWhiteSpace(nameEditor.Text))
         {

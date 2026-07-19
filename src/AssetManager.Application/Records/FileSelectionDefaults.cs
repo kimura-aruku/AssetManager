@@ -1,5 +1,6 @@
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Identifiers;
+using AssetManager.Domain.Values;
 
 namespace AssetManager.Application.Records;
 
@@ -10,15 +11,21 @@ public sealed record FileSelectionDefaults(
 public static class FileSelectionDefaultProvider
 {
     public static FileSelectionDefaults Create(
-        string filePath,
+        string targetPath,
+        TargetPathKind targetKind,
         IEnumerable<AssetTypeDefinition> assetTypes)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
         ArgumentNullException.ThrowIfNull(assetTypes);
 
-        var name = Path.GetFileNameWithoutExtension(filePath);
-        var extension = Path.GetExtension(filePath);
-        var typeIds = string.IsNullOrWhiteSpace(extension)
+        var pathWithoutTrailingSeparator = Path.TrimEndingDirectorySeparator(targetPath);
+        var name = targetKind == TargetPathKind.Folder
+            ? Path.GetFileName(pathWithoutTrailingSeparator)
+            : Path.GetFileNameWithoutExtension(pathWithoutTrailingSeparator);
+        var extension = targetKind == TargetPathKind.File
+            ? Path.GetExtension(pathWithoutTrailingSeparator)
+            : string.Empty;
+        var typeIds = extension.Length == 0
             ? []
             : assetTypes
                 .Where(type => type.MatchesExtension(extension))
