@@ -546,6 +546,10 @@ public sealed class RecordRowViewModel
             ? string.Join(", ", types.Values.Select(id => typeNames.GetValueOrDefault(id, id.Value)))
             : string.Empty;
         TargetPath = record.TargetPath?.Path ?? string.Empty;
+        LicenseExpiryDate = record
+            .GetValue<DateFieldValue>(BuiltInFieldIds.LicenseExpiryDate)?
+            .Value
+            .ToDisplayString() ?? string.Empty;
         License = CreateLicenseSummary(record);
         LicenseBadges = LicenseBadgeEvaluator.Evaluate(LicenseTerms.FromRecord(record));
         StatusIndicators = RecordIndicatorEvaluator.Evaluate(
@@ -574,6 +578,8 @@ public sealed class RecordRowViewModel
     public string Types { get; }
 
     public string TargetPath { get; }
+
+    public string LicenseExpiryDate { get; }
 
     public string License { get; }
 

@@ -75,6 +75,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         PickTargetFolderCommand = new RelayCommand(() => PickTarget(isFolder: true));
         OpenTargetCommand = new RelayCommand(OpenTarget, HasSelectedTarget);
         ShowTargetInExplorerCommand = new RelayCommand(ShowTargetInExplorer, HasSelectedTarget);
+        ShowRowTargetInExplorerCommand = new RelayCommand<RecordRowViewModel>(
+            ShowTargetInExplorer,
+            row => row.Record.TargetPath is not null);
         ShowManagementCommand = new AsyncRelayCommand(ShowManagementAsync);
         ShowSettingsCommand = new RelayCommand(_runtime.ShowSettingsWindow);
         SaveSearchCommand = new AsyncRelayCommand(SaveSearchAsync, () => !string.IsNullOrWhiteSpace(SavedSearchName));
@@ -194,6 +197,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public ICommand ShowTargetInExplorerCommand { get; }
 
+    public ICommand ShowRowTargetInExplorerCommand { get; }
+
     public ICommand ShowManagementCommand { get; }
 
     public ICommand ShowSettingsCommand { get; }
@@ -266,7 +271,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _allRecords.Clear();
         _allRecords.AddRange(snapshot.Records);
         _definitions.Clear();
-        foreach (var definition in snapshot.FieldDefinitions)
+        foreach (var definition in snapshot.FieldDefinitions
+                     .OrderBy(definition => definition.Id == BuiltInFieldIds.Favorite ? 0 : 1))
         {
             _definitions[definition.Id] = definition;
         }
@@ -306,7 +312,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         var settings = await _runtime.SearchConfiguration.LoadViewColumnsAsync(cancellationToken);
         var settingMap = settings.ToDictionary(setting => setting.Id, StringComparer.Ordinal);
         DisplayColumns.Clear();
-        foreach (var definition in snapshot.FieldDefinitions.Where(definition => !definition.MainTableRequired))
+        foreach (var definition in snapshot.FieldDefinitions.Where(definition =>
+                     !definition.MainTableRequired
+                     && definition.Id != BuiltInFieldIds.Favorite
+                     && definition.Id != BuiltInFieldIds.LicenseExpiryDate))
         {
             var visible = settingMap.TryGetValue(definition.Id.Value, out var setting)
                 ? setting.Visible
@@ -427,7 +436,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
         foreach (var definition in _definitions.Values
                      .Where(definition => definition.DetailVisible)
-                     .OrderBy(definition => definition.Id == BuiltInFieldIds.TargetPath ? 0 : 1))
+                     .OrderBy(definition => definition.Id == BuiltInFieldIds.Favorite
+                         ? 0
+                         : definition.Id == BuiltInFieldIds.TargetPath ? 1 : 2))
         {
             var searchField = SearchFields.FirstOrDefault(field => field.Definition.Id == definition.Id);
             var options = searchField?.Options.Select(option => new SelectableOptionViewModel(option.Id, option.Label));
@@ -700,6 +711,15 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private void ShowTargetInExplorer()
     {
         if (SelectedRecord?.Record.TargetPath is { } target)
+        {
+            var kind = target.Kind == TargetPathKind.File ? PathEntryKind.File : PathEntryKind.Folder;
+            TryShellAction(() => _runtime.Shell.ShowInExplorer(target.Path, kind));
+        }
+    }
+
+    private void ShowTargetInExplorer(RecordRowViewModel row)
+    {
+        if (row.Record.TargetPath is { } target)
         {
             var kind = target.Kind == TargetPathKind.File ? PathEntryKind.File : PathEntryKind.Folder;
             TryShellAction(() => _runtime.Shell.ShowInExplorer(target.Path, kind));

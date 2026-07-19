@@ -12,6 +12,7 @@ namespace AssetManager.App;
 
 public partial class MainWindow : Window
 {
+    private readonly List<DataGridColumn> _dynamicColumns = [];
     private bool _isNormalizingSelection;
     public MainWindow()
     {
@@ -54,14 +55,16 @@ public partial class MainWindow : Window
 
     private void RebuildDynamicColumns(MainWindowViewModel viewModel)
     {
-        while (RecordsGrid.Columns.Count > 6)
+        foreach (var column in _dynamicColumns)
         {
-            RecordsGrid.Columns.RemoveAt(RecordsGrid.Columns.Count - 1);
+            _ = RecordsGrid.Columns.Remove(column);
         }
+
+        _dynamicColumns.Clear();
 
         foreach (var option in viewModel.GetVisibleDynamicColumns())
         {
-            RecordsGrid.Columns.Add(new DataGridTextColumn
+            var column = new DataGridTextColumn
             {
                 Header = option.Label,
                 Width = 140,
@@ -70,7 +73,10 @@ public partial class MainWindow : Window
                 {
                     Mode = BindingMode.OneWay,
                 },
-            });
+            };
+            var expiryColumnIndex = RecordsGrid.Columns.IndexOf(LicenseExpiryColumn);
+            RecordsGrid.Columns.Insert(expiryColumnIndex, column);
+            _dynamicColumns.Add(column);
         }
     }
 
