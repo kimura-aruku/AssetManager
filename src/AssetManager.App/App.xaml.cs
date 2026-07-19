@@ -61,7 +61,11 @@ public partial class App : System.Windows.Application
             _undoRedo = runtime.UndoRedo;
             await _undoRedo.InitializeAsync(_lifetimeCancellation.Token);
 
-            var mainWindow = AppCompositionRoot.CreateMainWindow(result, runtime.PathChecks);
+            var mainWindow = AppCompositionRoot.CreateMainWindow(result, runtime);
+            if (mainWindow.DataContext is MainWindowViewModel initializedViewModel)
+            {
+                await initializedViewModel.InitializeAsync(_lifetimeCancellation.Token);
+            }
             MainWindow = mainWindow;
             ShutdownMode = ShutdownMode.OnMainWindowClose;
             mainWindow.Show();

@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Application.Resources>
     <ResourceDictionary>
+      <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
       <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="Themes/Default/Colors.xaml" />
         <ResourceDictionary Source="Themes/Default/Metrics.xaml" />

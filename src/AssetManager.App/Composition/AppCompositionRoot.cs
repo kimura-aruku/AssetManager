@@ -1,5 +1,9 @@
 using AssetManager.App.Presentation;
 using AssetManager.App.Windows;
+using AssetManager.Application.Catalog;
+using AssetManager.Application.Data;
+using AssetManager.Application.Fields;
+using AssetManager.Application.Records;
 using AssetManager.Application.Startup;
 using AssetManager.Application.History;
 using AssetManager.Application.Paths;
@@ -34,9 +38,10 @@ internal static class AppCompositionRoot
 
     public static MainWindow CreateMainWindow(
         StartupResult startupResult,
-        RecordPathCheckCoordinator pathChecks)
+        AppRuntimeServices runtime)
     {
-        var viewModel = new MainWindowViewModel(startupResult, pathChecks);
+        var dialogs = new WpfUserDialogService();
+        var viewModel = new MainWindowViewModel(startupResult, runtime, dialogs);
 
         return new MainWindow
         {
@@ -50,16 +55,36 @@ internal static class AppCompositionRoot
         var layout = new DataRootLayout(startupResult.DataRoot);
         var store = new JsonAssetManagerDataStore(layout);
         var fileSystem = new PhysicalWindowsPathFileSystem();
+        var undoRedo = new UndoRedoService(
+            store,
+            new FileUndoHistoryPersistence(layout));
+        var fields = new FieldApplicationService(store, history: undoRedo);
+        var catalog = new CatalogApplicationService(store);
         return new AppRuntimeServices(
-            new UndoRedoService(
-                store,
-                new FileUndoHistoryPersistence(layout)),
+            store,
+            undoRedo,
+            new RecordApplicationService(store, history: undoRedo),
+            fields,
+            catalog,
             new RecordPathCheckCoordinator(
                 store,
-            new PathCheckService(fileSystem)),
+                new PathCheckService(fileSystem)),
             new PathRegistrationService(fileSystem, new WpfWindowsPathPicker()),
             new WindowsShellService(),
-            new SearchConfigurationService(new JsonViewConfigurationStore(layout)));
+            new SearchConfigurationService(new JsonViewConfigurationStore(layout)),
+            () =>
+            {
+                var window = new ManagementWindow
+                {
+                    DataContext = new ManagementWindowViewModel(
+                        store,
+                        fields,
+                        catalog,
+                        new WpfUserDialogService()),
+                    Owner = System.Windows.Application.Current.MainWindow,
+                };
+                _ = window.ShowDialog();
+            });
     }
 }
 
@@ -68,8 +93,13 @@ internal sealed record AppServices(
     IStartupInitializer StartupInitializer);
 
 internal sealed record AppRuntimeServices(
+    IAssetManagerDataStore Store,
     UndoRedoService UndoRedo,
+    RecordApplicationService Records,
+    FieldApplicationService Fields,
+    CatalogApplicationService Catalog,
     RecordPathCheckCoordinator PathChecks,
     PathRegistrationService PathRegistration,
     IWindowsShellService Shell,
-    SearchConfigurationService SearchConfiguration);
+    SearchConfigurationService SearchConfiguration,
+    Action ShowManagementWindow);

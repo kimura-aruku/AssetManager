@@ -7,6 +7,9 @@
   <Color x:Key="TextPrimaryColor">#FF1C2733</Color>
   <Color x:Key="TextSecondaryColor">#FF536273</Color>
   <Color x:Key="BorderColor">#FFD7DEE7</Color>
+  <Color x:Key="DangerColor">#FFB42318</Color>
+  <Color x:Key="WarningColor">#FFB54708</Color>
+  <Color x:Key="SelectionColor">#FFE8F0FC</Color>
 
   <SolidColorBrush x:Key="AppBackgroundBrush"
                    Color="{StaticResource AppBackgroundColor}" />
@@ -22,4 +25,10 @@
                    Color="{StaticResource TextSecondaryColor}" />
   <SolidColorBrush x:Key="BorderBrush"
                    Color="{StaticResource BorderColor}" />
+  <SolidColorBrush x:Key="DangerBrush"
+                   Color="{StaticResource DangerColor}" />
+  <SolidColorBrush x:Key="WarningBrush"
+                   Color="{StaticResource WarningColor}" />
+  <SolidColorBrush x:Key="SelectionBrush"
+                   Color="{StaticResource SelectionColor}" />
 </ResourceDictionary>
