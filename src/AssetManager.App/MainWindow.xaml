@@ -340,12 +340,6 @@
                          FontSize="17"
                          FontWeight="SemiBold"
                          Text="{Binding EditorTitle}" />
-              <Button DockPanel.Dock="Right"
-                      MinWidth="38"
-                      Padding="8,4"
-                      Style="{StaticResource SecondaryButtonStyle}"
-                      Command="{Binding ToggleFavoriteCommand}"
-                      Content="☆/★" />
             </DockPanel>
             <StackPanel Margin="0,10,0,10" Orientation="Horizontal">
               <Button Command="{Binding SaveRecordCommand}" Content="保存" />
