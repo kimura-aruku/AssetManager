@@ -24,7 +24,7 @@
 
     <ProgressBar Grid.Row="2"
                  Height="8"
-                 Maximum="{Binding TotalSteps}"
-                 Value="{Binding CompletedSteps}" />
+                 Maximum="{Binding TotalSteps, Mode=OneWay}"
+                 Value="{Binding CompletedSteps, Mode=OneWay}" />
   </Grid>
 </Window>
