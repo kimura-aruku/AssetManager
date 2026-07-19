@@ -21,8 +21,9 @@ logs/
 tmp/
 temp/
 
-# Local agent instructions
+# Local agent instructions and task management
 AGENTS.md
+TASK.md
 
 # Dependencies and generated outputs
 node_modules/
