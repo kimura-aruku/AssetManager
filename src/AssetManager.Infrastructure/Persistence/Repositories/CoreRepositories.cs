@@ -190,11 +190,53 @@ public sealed class ViewSettingsRepository(AtomicJsonFileStore store)
     private static void Validate(ViewSettingsDocument document)
     {
         SchemaVersionGuard.EnsureCurrent(document.SchemaVersion);
-        if (document.MainTableColumns.Any(column => string.IsNullOrWhiteSpace(column.Id) || column.Width <= 0)
+        if (document.MainTableColumns.Any(column =>
+                string.IsNullOrWhiteSpace(column.Id)
+                || column.Order < 0
+                || column.Width <= 0)
             || document.MainTableColumns.Select(column => column.Id).Distinct(StringComparer.Ordinal).Count()
+            != document.MainTableColumns.Count
+            || document.MainTableColumns.Select(column => column.Order).Distinct().Count()
             != document.MainTableColumns.Count)
         {
             throw new DataPersistenceException("views.jsonのカラム設定が正しくありません。");
+        }
+
+        var searches = document.SavedSearches ?? [];
+        if (searches.Any(search =>
+                !Guid.TryParse(search.Id, out var searchId)
+                || searchId.ToString("D")[14] != '7'
+                || string.IsNullOrWhiteSpace(search.Name)
+                || search.Conditions.Select(condition => condition.FieldId)
+                    .Distinct(StringComparer.Ordinal).Count() != search.Conditions.Count)
+            || searches.Select(search => search.Id).Distinct(StringComparer.Ordinal).Count() != searches.Count)
+        {
+            throw new DataPersistenceException("views.jsonの保存済み検索が正しくありません。");
+        }
+
+        foreach (var condition in searches.SelectMany(search => search.Conditions))
+        {
+            _ = new Domain.Identifiers.FieldId(condition.FieldId);
+            var valid = condition.Kind switch
+            {
+                "text" => !string.IsNullOrWhiteSpace(condition.Text)
+                    && condition.Boolean is null
+                    && condition.OptionIds is null,
+                "boolean" => condition.Text is null
+                    && condition.Boolean is not null
+                    && condition.OptionIds is null,
+                "optionAny" => condition.Text is null
+                    && condition.Boolean is null
+                    && condition.OptionIds is { Count: > 0 }
+                    && condition.OptionIds.All(id => !string.IsNullOrWhiteSpace(id))
+                    && condition.OptionIds.Distinct(StringComparer.Ordinal).Count()
+                    == condition.OptionIds.Count,
+                _ => false,
+            };
+            if (!valid)
+            {
+                throw new DataPersistenceException("保存済み検索条件の形式が正しくありません。");
+            }
         }
     }
 }

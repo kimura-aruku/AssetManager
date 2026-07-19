@@ -18,6 +18,19 @@ public sealed record ViewColumnDocument(
     double Width,
     bool Visible);
 
+public sealed record SavedSearchConditionDocument(
+    string FieldId,
+    string Kind,
+    string? Text = null,
+    bool? Boolean = null,
+    IReadOnlyList<string>? OptionIds = null);
+
+public sealed record SavedSearchDocument(
+    string Id,
+    string Name,
+    IReadOnlyList<SavedSearchConditionDocument> Conditions);
+
 public sealed record ViewSettingsDocument(
     int SchemaVersion,
-    IReadOnlyList<ViewColumnDocument> MainTableColumns);
+    IReadOnlyList<ViewColumnDocument> MainTableColumns,
+    IReadOnlyList<SavedSearchDocument>? SavedSearches = null);

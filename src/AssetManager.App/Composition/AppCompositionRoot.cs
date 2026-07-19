@@ -3,6 +3,7 @@ using AssetManager.App.Windows;
 using AssetManager.Application.Startup;
 using AssetManager.Application.History;
 using AssetManager.Application.Paths;
+using AssetManager.Application.Search;
 using AssetManager.Infrastructure.History;
 using AssetManager.Infrastructure.Logging;
 using AssetManager.Infrastructure.Operations;
@@ -55,9 +56,10 @@ internal static class AppCompositionRoot
                 new FileUndoHistoryPersistence(layout)),
             new RecordPathCheckCoordinator(
                 store,
-                new PathCheckService(fileSystem)),
+            new PathCheckService(fileSystem)),
             new PathRegistrationService(fileSystem, new WpfWindowsPathPicker()),
-            new WindowsShellService());
+            new WindowsShellService(),
+            new SearchConfigurationService(new JsonViewConfigurationStore(layout)));
     }
 }
 
@@ -69,4 +71,5 @@ internal sealed record AppRuntimeServices(
     UndoRedoService UndoRedo,
     RecordPathCheckCoordinator PathChecks,
     PathRegistrationService PathRegistration,
-    IWindowsShellService Shell);
+    IWindowsShellService Shell,
+    SearchConfigurationService SearchConfiguration);
