@@ -1,6 +1,7 @@
 using AssetManager.Application.Fields;
 using AssetManager.Application.History;
 using AssetManager.Application.Records;
+using AssetManager.Application.Search;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
 using AssetManager.Domain.Values;
@@ -121,9 +122,53 @@ public sealed class FileUndoHistoryTests
         Assert.Empty(Directory.EnumerateDirectories(layout.UndoDirectory));
     }
 
+    [Fact]
+    public async Task UndoRedoを繰り返してJSONと一覧元データの整合性を維持する()
+    {
+        using var temporary = new TemporaryDirectory();
+        var layout = await InitializeAsync(temporary);
+        var store = new JsonAssetManagerDataStore(layout);
+        var persistence = new FileUndoHistoryPersistence(layout);
+        await using var history = new UndoRedoService(store, persistence);
+        await history.InitializeAsync();
+        var records = new RecordApplicationService(store, history: history);
+        var record = await records.CreateAsync(new Dictionary<FieldId, FieldValue?>
+        {
+            [BuiltInFieldIds.Name] = new TextFieldValue("初期"),
+        });
+        _ = await records.UpdateAsync(record.Id, new Dictionary<FieldId, FieldValue?>
+        {
+            [BuiltInFieldIds.Name] = new TextFieldValue("変更A"),
+        });
+        _ = await records.UpdateAsync(record.Id, new Dictionary<FieldId, FieldValue?>
+        {
+            [BuiltInFieldIds.Name] = new TextFieldValue("変更B"),
+        });
+
+        for (var cycle = 0; cycle < 3; cycle++)
+        {
+            Assert.True(await history.UndoAsync());
+            Assert.Equal("変更A", await GetVisibleNameAsync(store));
+            Assert.True(await history.UndoAsync());
+            Assert.Equal("初期", await GetVisibleNameAsync(store));
+            Assert.True(await history.RedoAsync());
+            Assert.Equal("変更A", await GetVisibleNameAsync(store));
+            Assert.True(await history.RedoAsync());
+            Assert.Equal("変更B", await GetVisibleNameAsync(store));
+        }
+    }
+
     private static async Task<DataRootLayout> InitializeAsync(TemporaryDirectory temporary)
     {
         var result = await new DataSetInitializer(new AppDataPaths(temporary.Path)).InitializeAsync();
         return new DataRootLayout(result.DataRoot);
+    }
+
+    private static async Task<string> GetVisibleNameAsync(JsonAssetManagerDataStore store)
+    {
+        var snapshot = await store.LoadAsync();
+        var session = new RecordSearchSession(snapshot.Records, new SearchQuery());
+        var record = Assert.Single(session.VisibleRecords);
+        return record.GetValue<TextFieldValue>(BuiltInFieldIds.Name)!.Value;
     }
 }
