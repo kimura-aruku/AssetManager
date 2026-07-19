@@ -6,6 +6,7 @@ Desktop.ini
 # Editors and IDEs
 .idea/
 .vscode/
+.vs/
 *.swp
 *.swo
 
@@ -30,6 +31,8 @@ dist/
 build/
 out/
 coverage/
+artifacts/
+TestResults/
 bin/
 obj/
 target/

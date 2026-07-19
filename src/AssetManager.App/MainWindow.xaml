@@ -1,0 +1,441 @@
+<Window x:Class="AssetManager.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:windows="clr-namespace:AssetManager.App.Windows"
+        xmlns:status="clr-namespace:AssetManager.Application.Status;assembly=AssetManager.Application"
+        Title="AssetManager"
+        Width="1480"
+        Height="860"
+        MinWidth="1120"
+        MinHeight="640"
+        WindowStartupLocation="CenterScreen">
+  <Window.InputBindings>
+    <KeyBinding Key="N" Modifiers="Ctrl" Command="{Binding NewRecordCommand}" />
+    <KeyBinding Key="S" Modifiers="Ctrl" Command="{Binding SaveRecordCommand}" />
+    <KeyBinding Key="Delete" Command="{Binding DeleteRecordCommand}" />
+    <KeyBinding Key="Z" Modifiers="Ctrl" Command="{Binding UndoCommand}" />
+    <KeyBinding Key="Y" Modifiers="Ctrl" Command="{Binding RedoCommand}" />
+    <KeyBinding Key="C" Modifiers="Ctrl" Command="{Binding CopySelectionCommand}" />
+    <KeyBinding Key="V" Modifiers="Ctrl" Command="{Binding PasteSelectionCommand}" />
+    <KeyBinding Key="F5" Command="{Binding CheckAllPathsCommand}" />
+  </Window.InputBindings>
+
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <Border Padding="14,10"
+            Background="{DynamicResource SurfaceBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="0,0,0,1">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+          <TextBlock Margin="0,0,18,0"
+                     VerticalAlignment="Center"
+                     FontSize="22"
+                     FontWeight="SemiBold"
+                     Text="AssetManager" />
+          <Button Command="{Binding NewRecordCommand}" Content="＋ 新規 (Ctrl+N)" />
+          <Button Margin="8,0,0,0"
+                  Style="{StaticResource SecondaryButtonStyle}"
+                  Command="{Binding SaveRecordCommand}"
+                  Content="保存 (Ctrl+S)" />
+          <Button Margin="8,0,0,0"
+                  Style="{StaticResource SecondaryButtonStyle}"
+                  Command="{Binding UndoCommand}"
+                  Content="元に戻す" />
+          <Button Margin="4,0,0,0"
+                  Style="{StaticResource SecondaryButtonStyle}"
+                  Command="{Binding RedoCommand}"
+                  Content="やり直す" />
+          <Button Margin="8,0,0,0"
+                  Style="{StaticResource SecondaryButtonStyle}"
+                  Command="{Binding CopySelectionCommand}"
+                  Content="コピー" />
+          <Button Margin="4,0,0,0"
+                  Style="{StaticResource SecondaryButtonStyle}"
+                  Command="{Binding PasteSelectionCommand}"
+                  Content="貼り付け" />
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button Style="{StaticResource SecondaryButtonStyle}"
+                  Command="{Binding CheckAllPathsCommand}"
+                  Content="パス確認 (F5)" />
+          <Button Margin="4,0,0,0"
+                  Style="{StaticResource SecondaryButtonStyle}"
+                  Command="{Binding CancelPathCheckCommand}"
+                  Content="中止" />
+          <Button Margin="8,0,0,0"
+                  Style="{StaticResource SecondaryButtonStyle}"
+                  Command="{Binding ShowManagementCommand}"
+                  Content="カラム・分類管理" />
+          <Button Margin="4,0,0,0"
+                  Style="{StaticResource SecondaryButtonStyle}"
+                  Command="{Binding ShowSettingsCommand}"
+                  Content="設定" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="280" MinWidth="220" />
+        <ColumnDefinition Width="5" />
+        <ColumnDefinition Width="*" MinWidth="440" />
+        <ColumnDefinition Width="5" />
+        <ColumnDefinition Width="360" MinWidth="300" />
+      </Grid.ColumnDefinitions>
+
+      <!-- 左ペイン: すべての検索条件と表示構成 -->
+      <Border Padding="14"
+              Background="{DynamicResource SurfaceBrush}"
+              BorderBrush="{DynamicResource BorderBrush}"
+              BorderThickness="0,0,1,0">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top">
+            <TextBlock FontSize="17" FontWeight="SemiBold" Text="検索・絞り込み" />
+            <StackPanel Margin="0,10,0,10" Orientation="Horizontal">
+              <Button Command="{Binding ApplySearchCommand}" Content="検索" />
+              <Button Margin="6,0,0,0"
+                      Style="{StaticResource SecondaryButtonStyle}"
+                      Command="{Binding ClearSearchCommand}"
+                      Content="クリア" />
+            </StackPanel>
+            <Expander Margin="0,0,0,10" Header="保存済み検索">
+              <StackPanel Margin="0,6,0,0">
+                <ComboBox ItemsSource="{Binding SavedSearches}"
+                          SelectedItem="{Binding SelectedSavedSearch}"
+                          DisplayMemberPath="Name" />
+                <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
+                  <Button Style="{StaticResource SecondaryButtonStyle}"
+                          Command="{Binding LoadSavedSearchCommand}"
+                          Content="読込" />
+                  <Button Margin="4,0,0,0"
+                          Style="{StaticResource DangerButtonStyle}"
+                          Command="{Binding DeleteSavedSearchCommand}"
+                          Content="削除" />
+                </StackPanel>
+                <TextBox Margin="0,6,0,0"
+                         Text="{Binding SavedSearchName, UpdateSourceTrigger=PropertyChanged}" />
+                <Button Margin="0,4,0,0"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding SaveSearchCommand}"
+                        Content="現在の条件を保存" />
+              </StackPanel>
+            </Expander>
+            <Expander Margin="0,0,0,10" Header="一覧の表示カラム">
+              <ItemsControl Margin="0,6,0,0" ItemsSource="{Binding DisplayColumns}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <CheckBox Margin="0,2"
+                              Content="{Binding Label}"
+                              IsChecked="{Binding IsVisible}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Expander>
+          </StackPanel>
+
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding SearchFields}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Margin="0,0,4,12">
+                    <TextBlock Margin="0,0,0,4" FontWeight="SemiBold" Text="{Binding Label}" />
+                    <TextBox Visibility="{Binding IsText, Converter={StaticResource BooleanToVisibilityConverter}}"
+                             Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
+                    <ComboBox Visibility="{Binding IsBoolean, Converter={StaticResource BooleanToVisibilityConverter}}"
+                              SelectedIndex="{Binding BooleanMode}">
+                      <ComboBoxItem Content="指定なし" />
+                      <ComboBoxItem Content="オン" />
+                      <ComboBoxItem Content="オフ" />
+                    </ComboBox>
+                    <ItemsControl Visibility="{Binding IsOption, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                  ItemsSource="{Binding Options}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <CheckBox Margin="0,2"
+                                    Content="{Binding Label}"
+                                    IsChecked="{Binding IsSelected}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+
+      <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" />
+
+      <!-- 中央ペイン: 素材一覧 -->
+      <Grid Grid.Column="2" Margin="10">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <DockPanel Margin="2,0,2,8">
+          <TextBlock FontSize="17" FontWeight="SemiBold" Text="素材一覧" />
+          <TextBlock Margin="12,3,0,0"
+                     Style="{StaticResource BodyTextStyle}"
+                     Text="{Binding TotalMatchCount, StringFormat={}{0} 件}" />
+        </DockPanel>
+        <DataGrid x:Name="RecordsGrid"
+                  Grid.Row="1"
+                  ItemsSource="{Binding Records}"
+                  SelectedItem="{Binding SelectedRecord}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  SelectionMode="Extended"
+                  SelectionUnit="CellOrRowHeader"
+                  SelectedCellsChanged="OnSelectedCellsChanged"
+                  PreviewMouseLeftButtonDown="OnGridPreviewMouseLeftButtonDown"
+                  CanUserSortColumns="False"
+                  HeadersVisibility="All"
+                  AlternationCount="2">
+          <DataGrid.ContextMenu>
+            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+              <MenuItem Command="{Binding ToggleFavoriteCommand}" Header="お気に入り切り替え" />
+              <MenuItem Command="{Binding OpenTargetCommand}" Header="対象を開く" />
+              <MenuItem Command="{Binding ShowTargetInExplorerCommand}" Header="Explorerで表示" />
+              <Separator />
+              <MenuItem Command="{Binding CopySelectionCommand}" Header="選択セルをコピー" InputGestureText="Ctrl+C" />
+              <MenuItem Command="{Binding PasteSelectionCommand}" Header="選択セルへ貼り付け" InputGestureText="Ctrl+V" />
+              <Separator />
+              <MenuItem Command="{Binding SaveRecordCommand}" Header="保存" InputGestureText="Ctrl+S" />
+              <MenuItem Command="{Binding DeleteRecordCommand}" Header="管理レコードを削除" InputGestureText="Delete" />
+            </ContextMenu>
+          </DataGrid.ContextMenu>
+          <DataGrid.Columns>
+            <DataGridTextColumn Width="2*" MinWidth="180" Header="パス" SortMemberPath="builtin.targetPath" Binding="{Binding TargetPath}" />
+            <DataGridTextColumn Width="38" Header="★" SortMemberPath="builtin.favorite" Binding="{Binding FavoriteGlyph}" />
+            <DataGridTextColumn Width="1.3*" MinWidth="150" Header="素材名" SortMemberPath="builtin.name" Binding="{Binding Name}" />
+            <DataGridTextColumn Width="120" Header="種類" SortMemberPath="builtin.assetTypes" Binding="{Binding Types}" />
+            <DataGridTemplateColumn Width="110" Header="状態" SortMemberPath="computed.statusIndicators">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <ItemsControl ItemsSource="{Binding StatusIndicators}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border Margin="1" Padding="4,1" CornerRadius="3" ToolTip="{Binding ToolTip}">
+                          <Border.Style>
+                            <Style TargetType="Border">
+                              <Setter Property="Background" Value="{DynamicResource BorderBrush}" />
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding Severity}" Value="{x:Static status:RecordIndicatorSeverity.Error}">
+                                  <Setter Property="Background" Value="{DynamicResource DangerBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Severity}" Value="{x:Static status:RecordIndicatorSeverity.Warning}">
+                                  <Setter Property="Background" Value="{DynamicResource WarningBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Severity}" Value="{x:Static status:RecordIndicatorSeverity.Success}">
+                                  <Setter Property="Background" Value="{DynamicResource SuccessBrush}" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Border.Style>
+                          <TextBlock Foreground="White" FontWeight="Bold" FontSize="11" Text="{Binding Glyph}" />
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTemplateColumn Width="1.4*" MinWidth="150" Header="ライセンス条件" SortMemberPath="computed.licenseSummary">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <ItemsControl ItemsSource="{Binding LicenseBadges}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border Margin="1" Padding="4,1" CornerRadius="3" ToolTip="{Binding ToolTip}">
+                          <Border.Style>
+                            <Style TargetType="Border">
+                              <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsRequired}" Value="True">
+                                  <Setter Property="Background" Value="{DynamicResource WarningBrush}" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Border.Style>
+                          <TextBlock Foreground="White" FontWeight="Bold" FontSize="10" Text="{Binding Glyph}" />
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+          </DataGrid.Columns>
+        </DataGrid>
+        <Button Grid.Row="2"
+                Margin="0,8,0,0"
+                HorizontalAlignment="Center"
+                Style="{StaticResource SecondaryButtonStyle}"
+                Visibility="{Binding HasMoreRecords, Converter={StaticResource BooleanToVisibilityConverter}}"
+                Command="{Binding LoadMoreCommand}"
+                Content="さらに100件読み込む" />
+      </Grid>
+
+      <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" />
+
+      <!-- 右ペイン: 型別の動的詳細編集 -->
+      <Border Grid.Column="4"
+              Padding="14"
+              Background="{DynamicResource SurfaceBrush}"
+              BorderBrush="{DynamicResource BorderBrush}"
+              BorderThickness="1,0,0,0">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top">
+            <DockPanel>
+              <TextBlock VerticalAlignment="Center"
+                         FontSize="17"
+                         FontWeight="SemiBold"
+                         Text="{Binding EditorTitle}" />
+              <Button DockPanel.Dock="Right"
+                      MinWidth="38"
+                      Padding="8,4"
+                      Style="{StaticResource SecondaryButtonStyle}"
+                      Command="{Binding ToggleFavoriteCommand}"
+                      Content="☆/★" />
+            </DockPanel>
+            <StackPanel Margin="0,10,0,10" Orientation="Horizontal">
+              <Button Command="{Binding SaveRecordCommand}" Content="保存" />
+              <Button Margin="6,0,0,0"
+                      Style="{StaticResource DangerButtonStyle}"
+                      Command="{Binding DeleteRecordCommand}"
+                      Content="レコード削除" />
+            </StackPanel>
+          </StackPanel>
+
+          <TextBlock HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     Text="一覧から素材を選択するか、新規ボタンを押してください。">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding IsEditorVisible}" Value="False">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+
+          <ScrollViewer VerticalScrollBarVisibility="Auto"
+                        Visibility="{Binding IsEditorVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <ItemsControl ItemsSource="{Binding DetailFields}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Margin="0,0,4,14">
+                    <TextBlock FontWeight="SemiBold" Text="{Binding Label}" />
+                    <TextBlock Margin="0,1,0,4"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="{Binding Hint}" />
+                    <CheckBox Margin="0,4"
+                              Visibility="{Binding IsBoolean, Converter={StaticResource BooleanToVisibilityConverter}}"
+                              IsChecked="{Binding BooleanValue}"
+                              Content="オン" />
+                    <ComboBox Visibility="{Binding IsSingleOption, Converter={StaticResource BooleanToVisibilityConverter}}"
+                              ItemsSource="{Binding Options}"
+                              DisplayMemberPath="Label"
+                              SelectedValuePath="Id"
+                              SelectedValue="{Binding SelectedOptionId}" />
+                    <ItemsControl Visibility="{Binding IsMultiOption, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                  ItemsSource="{Binding Options}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <CheckBox Margin="0,2,12,2"
+                                    Content="{Binding Label}"
+                                    IsChecked="{Binding IsSelected}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <DatePicker Visibility="{Binding IsDate, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Language="ja-JP"
+                                SelectedDateFormat="Short"
+                                SelectedDate="{Binding SelectedDate}" />
+                    <DockPanel Visibility="{Binding IsNumber, Converter={StaticResource BooleanToVisibilityConverter}}">
+                      <TextBlock DockPanel.Dock="Right"
+                                 Margin="8,0,0,0"
+                                 VerticalAlignment="Center"
+                                 Text="{Binding NumberSuffix}" />
+                      <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
+                               HorizontalContentAlignment="Right"
+                               windows:NumericInputBehavior.IsEnabled="True"
+                               windows:NumericInputBehavior.IsInteger="{Binding IsCurrency}" />
+                    </DockPanel>
+                    <TextBox Visibility="{Binding IsText, Converter={StaticResource BooleanToVisibilityConverter}}"
+                             Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="{Binding AcceptsMultipleLines}"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto">
+                      <TextBox.Style>
+                        <Style TargetType="TextBox">
+                          <Setter Property="MinHeight" Value="30" />
+                          <Setter Property="Padding" Value="6,4" />
+                          <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding AcceptsMultipleLines}" Value="True">
+                              <Setter Property="MinHeight" Value="74" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBox.Style>
+                    </TextBox>
+                    <StackPanel Margin="0,5,0,0"
+                                Orientation="Horizontal"
+                                Visibility="{Binding IsTargetPath, Converter={StaticResource BooleanToVisibilityConverter}}">
+                      <Button Style="{StaticResource SecondaryButtonStyle}"
+                              Command="{Binding DataContext.PickTargetFileCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                              Content="ファイル選択" />
+                      <Button Margin="5,0,0,0"
+                              Style="{StaticResource SecondaryButtonStyle}"
+                              Command="{Binding DataContext.PickTargetFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                              Content="フォルダー選択" />
+                    </StackPanel>
+                    <TextBlock Margin="0,4,0,0"
+                               Foreground="{DynamicResource WarningBrush}"
+                               FontSize="12"
+                               Text="{Binding Warning}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="2"
+            Padding="12,6"
+            Background="{DynamicResource SurfaceBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="0,1,0,0">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Right"
+                   Style="{StaticResource StatusTextStyle}"
+                   Text="{Binding DataRoot, StringFormat=データ: {0}}" />
+        <TextBlock Style="{StaticResource StatusTextStyle}" Text="{Binding StatusMessage}" />
+      </DockPanel>
+    </Border>
+  </Grid>
+</Window>
