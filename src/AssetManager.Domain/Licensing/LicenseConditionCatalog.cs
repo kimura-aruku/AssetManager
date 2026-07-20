@@ -12,7 +12,7 @@ public sealed record LicenseConditionDefinition(
     string Glyph,
     bool IsRequired)
 {
-    public string ToolTip => $"{Summary}{Environment.NewLine}{Description}";
+    public string ToolTip => Description;
 }
 
 public static class LicenseConditionCatalog

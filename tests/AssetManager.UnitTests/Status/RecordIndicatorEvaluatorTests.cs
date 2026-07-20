@@ -36,7 +36,10 @@ public sealed class RecordIndicatorEvaluatorTests
         Assert.False(badges[2].IsRequired);
         Assert.True(badges[3].IsRequired);
         Assert.False(badges[4].IsRequired);
-        Assert.Contains("利用者が確認できる場所", badges[3].ToolTip, StringComparison.Ordinal);
+        Assert.Equal(
+            "クレジット画面など、利用者が確認できる場所への作者名等の表示が必要です。",
+            badges[3].ToolTip);
+        Assert.DoesNotContain("利用者向けの作者表示が必要", badges[3].ToolTip, StringComparison.Ordinal);
     }
 
     [Fact]

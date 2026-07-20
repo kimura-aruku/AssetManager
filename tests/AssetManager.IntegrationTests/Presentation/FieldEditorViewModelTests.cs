@@ -186,11 +186,11 @@ public sealed class FieldEditorViewModelTests
         Assert.Equal(12, licenseEditors.Length);
         Assert.All(licenseEditors, editor => Assert.False(editor.IsStandaloneBoolean));
         Assert.All(licenseEditors, editor => Assert.False(string.IsNullOrWhiteSpace(editor.LicenseConditionToolTip)));
-        Assert.Contains(
-            "営利目的の製品・サービスで利用できます。",
-            licenseEditors.Single(editor => editor.Definition.SystemRole == SystemRole.CommercialUseAllowed)
-                .LicenseConditionToolTip,
-            StringComparison.Ordinal);
+        var commercialUseToolTip = licenseEditors
+            .Single(editor => editor.Definition.SystemRole == SystemRole.CommercialUseAllowed)
+            .LicenseConditionToolTip;
+        Assert.Equal("営利目的の製品・サービスで利用できます。", commercialUseToolTip);
+        Assert.DoesNotContain("商用利用できる", commercialUseToolTip, StringComparison.Ordinal);
         Assert.False(licenseEditors[0].IsDetailItemVisible);
 
         licenseEditors[0].ShowLicenseConditionGroup();

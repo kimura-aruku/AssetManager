@@ -30,7 +30,7 @@ public sealed record LicenseBadge(
     string Description,
     bool IsRequired)
 {
-    public string ToolTip => $"{Name}{Environment.NewLine}{Summary}{Environment.NewLine}{Description}";
+    public string ToolTip => Description;
 }
 
 public enum RecordIndicatorKind
