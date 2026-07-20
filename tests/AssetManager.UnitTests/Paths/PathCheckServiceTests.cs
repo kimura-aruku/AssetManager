@@ -1,4 +1,11 @@
 using AssetManager.Application.Paths;
+using AssetManager.Application.Data;
+using AssetManager.Application.Status;
+using AssetManager.Domain.Fields;
+using AssetManager.Domain.Licensing;
+using AssetManager.Domain.Records;
+using AssetManager.Domain.Values;
+using AssetManager.UnitTests.Testing;
 
 namespace AssetManager.UnitTests.Paths;
 
@@ -68,6 +75,46 @@ public sealed class PathCheckServiceTests
         Assert.Equal(PathCheckStatus.Error, result.Results[@"C:\error"].Status);
     }
 
+    [Fact]
+    public async Task SavedRecordPathCheckPopulatesCacheBeforeRowEvaluation()
+    {
+        var now = new DateTimeOffset(2026, 7, 20, 0, 0, 0, TimeSpan.Zero);
+        var targetDefinition = BuiltInFieldCatalog.All.Single(
+            definition => definition.Id == BuiltInFieldIds.TargetPath);
+        var receiptDefinition = BuiltInFieldCatalog.All.Single(
+            definition => definition.Id == BuiltInFieldIds.ReceiptPath);
+        var record = AssetRecord.Create(now)
+            .SetValue(
+                targetDefinition,
+                new TargetPathFieldValue(TargetPathKind.File, @"C:\Assets\item.png"),
+                now)
+            .SetValue(
+                receiptDefinition,
+                new FilePathFieldValue(@"C:\Assets\receipt.pdf"),
+                now);
+        var store = new TestDataStore(new AssetManagerDataSnapshot(
+            BuiltInFieldCatalog.All,
+            [],
+            [],
+            [],
+            [record]));
+        var coordinator = new RecordPathCheckCoordinator(
+            store,
+            new PathCheckService(new AvailableFileSystem()));
+
+        var result = await coordinator.CheckRecordAsync(record);
+        var indicators = RecordIndicatorEvaluator.Evaluate(
+            record,
+            new AssetDate(new DateOnly(2026, 7, 20)),
+            new LicenseWarningPolicy(),
+            coordinator.Cache);
+
+        Assert.Equal(2, result.CheckedCount);
+        Assert.Equal(2, coordinator.Cache.Count);
+        Assert.All(coordinator.Cache.Values, item => Assert.Equal(PathCheckStatus.Available, item.Status));
+        Assert.Equal(RecordIndicatorKind.PathsAvailable, Assert.Single(indicators).Kind);
+    }
+
     private sealed class TrackingFileSystem(TimeSpan delay) : IWindowsPathFileSystem
     {
         private int _activeChecks;
@@ -131,5 +178,14 @@ public sealed class PathCheckServiceTests
                     : PathCheckStatus.Error;
             return new PathCheckResult(path, status);
         }
+    }
+
+    private sealed class AvailableFileSystem : IWindowsPathFileSystem
+    {
+        public DriveType GetDriveType(string driveRoot) => DriveType.Fixed;
+
+        public PathEntryKind? GetExistingKind(string path) => PathEntryKind.File;
+
+        public PathCheckResult Check(string path) => new(path, PathCheckStatus.Available);
     }
 }

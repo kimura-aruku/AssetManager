@@ -102,6 +102,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public event EventHandler? GridColumnsChanged;
 
+    public event EventHandler? DetailScrollToTopRequested;
+
     public string DataRoot { get; }
 
     public string StartupSummary { get; }
@@ -448,6 +450,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsEditorVisible));
         StatusMessage = "新しい素材の情報を入力してください。";
         RelayCommand.RefreshCanExecute();
+        DetailScrollToTopRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void LoadEditors(AssetRecord? record)
@@ -515,8 +518,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 return;
             }
 
+            var pathCheckSucceeded = await RefreshSavedRecordPathsAsync(saved);
             await ReloadAndSelectAsync(saved.Id);
-            StatusMessage = $"「{CreateRow(saved).Name}」を保存しました。";
+            StatusMessage = pathCheckSucceeded
+                ? $"「{CreateRow(saved).Name}」を保存しました。"
+                : $"「{CreateRow(saved).Name}」を保存しましたが、パス確認に失敗しました。";
         }
         catch (Exception exception)
         {
@@ -960,6 +966,20 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         SelectedRecord = Records.FirstOrDefault(row => row.Record.Id == id);
         _isDraft = false;
         OnPropertyChanged(nameof(EditorTitle));
+    }
+
+    private async Task<bool> RefreshSavedRecordPathsAsync(AssetRecord record)
+    {
+        try
+        {
+            _ = await _runtime.PathChecks.CheckRecordAsync(record);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            await _runtime.Logger.LogErrorAsync("レコード保存後のパス確認", exception);
+            return false;
+        }
     }
 
     private async Task CheckAllPathsAsync(bool refreshCachedResults)

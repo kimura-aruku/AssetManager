@@ -331,7 +331,8 @@
               Padding="14"
               Background="{DynamicResource SurfaceBrush}"
               BorderBrush="{DynamicResource BorderBrush}"
-              BorderThickness="1,0,0,0">
+              BorderThickness="1,0,0,0"
+              PreviewMouseWheel="OnDetailPreviewMouseWheel">
         <DockPanel>
           <StackPanel DockPanel.Dock="Top"
                       Visibility="{Binding IsEditorVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -365,7 +366,8 @@
             </TextBlock.Style>
           </TextBlock>
 
-          <ScrollViewer VerticalScrollBarVisibility="Auto"
+          <ScrollViewer x:Name="DetailScrollViewer"
+                        VerticalScrollBarVisibility="Auto"
                         Visibility="{Binding IsEditorVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
             <ItemsControl ItemsSource="{Binding DetailFields}">
               <ItemsControl.ItemTemplate>

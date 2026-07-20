@@ -4,6 +4,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using AssetManager.App.Presentation;
 using AssetManager.Application.GridEditing;
 using AssetManager.Domain.Identifiers;
@@ -25,6 +26,7 @@ public partial class MainWindow : Window
         if (DataContext is MainWindowViewModel viewModel)
         {
             viewModel.GridColumnsChanged -= OnGridColumnsChanged;
+            viewModel.DetailScrollToTopRequested -= OnDetailScrollToTopRequested;
         }
 
         (DataContext as IDisposable)?.Dispose();
@@ -36,13 +38,32 @@ public partial class MainWindow : Window
         if (e.OldValue is MainWindowViewModel oldViewModel)
         {
             oldViewModel.GridColumnsChanged -= OnGridColumnsChanged;
+            oldViewModel.DetailScrollToTopRequested -= OnDetailScrollToTopRequested;
         }
 
         if (e.NewValue is MainWindowViewModel newViewModel)
         {
             newViewModel.GridColumnsChanged += OnGridColumnsChanged;
+            newViewModel.DetailScrollToTopRequested += OnDetailScrollToTopRequested;
             RebuildDynamicColumns(newViewModel);
         }
+    }
+
+    private void OnDetailPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        var offset = Math.Clamp(
+            DetailScrollViewer.VerticalOffset - e.Delta,
+            0,
+            DetailScrollViewer.ScrollableHeight);
+        DetailScrollViewer.ScrollToVerticalOffset(offset);
+        e.Handled = true;
+    }
+
+    private void OnDetailScrollToTopRequested(object? sender, EventArgs e)
+    {
+        _ = Dispatcher.InvokeAsync(
+            DetailScrollViewer.ScrollToTop,
+            DispatcherPriority.Loaded);
     }
 
     private void OnGridColumnsChanged(object? sender, EventArgs e)
