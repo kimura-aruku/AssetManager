@@ -173,6 +173,21 @@ public partial class MainWindow : Window
         menu.IsOpen = true;
     }
 
+    private void OnUrlInputLostFocus(object sender, RoutedEventArgs e)
+    {
+        var current = sender as DependencyObject;
+        while (current is not null)
+        {
+            if (current is FrameworkElement { DataContext: FieldEditorViewModel editor })
+            {
+                editor.ValidateUrlInput();
+                return;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+    }
+
     private void UpdateViewModelSelection()
     {
         if (DataContext is not MainWindowViewModel viewModel)

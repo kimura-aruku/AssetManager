@@ -372,10 +372,26 @@
                 <DataTemplate>
                   <StackPanel Margin="0,0,4,14"
                               Visibility="{Binding IsDetailItemVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <TextBlock Margin="0,0,0,4"
-                               FontWeight="SemiBold"
-                               Text="{Binding Label}"
-                               Visibility="{Binding IsNonBoolean, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <StackPanel Margin="0,0,0,4"
+                                Orientation="Horizontal"
+                                Visibility="{Binding IsNonBoolean, Converter={StaticResource BooleanToVisibilityConverter}}">
+                      <TextBlock FontWeight="SemiBold" Text="{Binding Label}" />
+                      <TextBlock Margin="6,0,0,0"
+                                 VerticalAlignment="Center"
+                                 FontSize="14"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource SuccessBrush}"
+                                 Text="✓"
+                                 ToolTip="URLの書式に問題はありません（接続確認は行っていません）"
+                                 Visibility="{Binding ShowsValidUrlIndicator, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                      <TextBlock Margin="6,0,0,0"
+                                 VerticalAlignment="Center"
+                                 FontSize="14"
+                                 Foreground="{DynamicResource WarningBrush}"
+                                 Text="⚠"
+                                 ToolTip="{Binding Warning}"
+                                 Visibility="{Binding ShowsInvalidUrlIndicator, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
                     <CheckBox Margin="0"
                               Visibility="{Binding IsStandaloneBoolean, Converter={StaticResource BooleanToVisibilityConverter}}"
                               IsChecked="{Binding BooleanValue}"
@@ -484,7 +500,8 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                       </Grid.ColumnDefinitions>
-                      <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
+                      <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
+                               LostFocus="OnUrlInputLostFocus" />
                       <Button Grid.Column="1"
                               Width="32"
                               MinHeight="30"
@@ -562,7 +579,9 @@
                                 <ColumnDefinition Width="Auto" />
                               </Grid.ColumnDefinitions>
                               <TextBox Text="{Binding PrimaryText, UpdateSourceTrigger=PropertyChanged}" />
-                              <TextBox Grid.Column="1" Margin="5,0,0,0" Text="{Binding SecondaryText, UpdateSourceTrigger=PropertyChanged}" />
+                              <TextBox Grid.Column="1"
+                                       Margin="5,0,0,0"
+                                       Text="{Binding SecondaryText, UpdateSourceTrigger=PropertyChanged}" />
                               <Button Grid.Column="2"
                                       Margin="5,0,0,0"
                                       MinHeight="30"
@@ -594,7 +613,10 @@
                                 <ColumnDefinition Width="Auto" />
                               </Grid.ColumnDefinitions>
                               <TextBox Text="{Binding PrimaryText, UpdateSourceTrigger=PropertyChanged}" />
-                              <TextBox Grid.Column="1" Margin="5,0,0,0" Text="{Binding SecondaryText, UpdateSourceTrigger=PropertyChanged}" />
+                              <TextBox Grid.Column="1"
+                                       Margin="5,0,0,0"
+                                       Text="{Binding SecondaryText, UpdateSourceTrigger=PropertyChanged}"
+                                       LostFocus="OnUrlInputLostFocus" />
                               <Button Grid.Column="2"
                                       Width="32"
                                       MinHeight="30"

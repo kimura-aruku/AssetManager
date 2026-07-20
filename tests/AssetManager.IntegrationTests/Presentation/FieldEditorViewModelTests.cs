@@ -102,6 +102,56 @@ public sealed class FieldEditorViewModelTests
     }
 
     [Fact]
+    public void URLは明示的な検証後に書式判定を表示する()
+    {
+        var definition = BuiltInFieldCatalog.All.Single(field => field.Id == BuiltInFieldIds.ProductUrl);
+        var editor = new FieldEditorViewModel(definition, value: null);
+
+        editor.Text = "https://example.invalid/product";
+
+        Assert.False(editor.ShowsValidUrlIndicator);
+        Assert.False(editor.ShowsInvalidUrlIndicator);
+
+        editor.ValidateUrlInput();
+
+        Assert.True(editor.ShowsValidUrlIndicator);
+        Assert.False(editor.ShowsInvalidUrlIndicator);
+        Assert.Null(editor.Warning);
+
+        editor.Text = "file:///C:/Assets/product.html";
+
+        Assert.False(editor.ShowsValidUrlIndicator);
+        Assert.False(editor.ShowsInvalidUrlIndicator);
+
+        editor.ValidateUrlInput();
+
+        Assert.False(editor.ShowsValidUrlIndicator);
+        Assert.True(editor.ShowsInvalidUrlIndicator);
+        Assert.StartsWith("HTTPまたはHTTPSのURLを指定してください。", editor.Warning);
+    }
+
+    [Fact]
+    public void 関連URLは入力行全体をまとめて書式判定する()
+    {
+        var definition = BuiltInFieldCatalog.All.Single(field => field.Id == BuiltInFieldIds.RelatedUrls);
+        var editor = new FieldEditorViewModel(definition, value: null);
+        editor.Entries[0].PrimaryText = "商品ページ";
+        editor.Entries[0].SecondaryText = "https://example.invalid/product";
+
+        editor.ValidateUrlInput();
+
+        Assert.True(editor.ShowsValidUrlIndicator);
+        Assert.False(editor.ShowsInvalidUrlIndicator);
+
+        editor.Entries[0].PrimaryText = string.Empty;
+        editor.ValidateUrlInput();
+
+        Assert.False(editor.ShowsValidUrlIndicator);
+        Assert.True(editor.ShowsInvalidUrlIndicator);
+        Assert.Contains("タイトルと値を両方入力してください。", editor.Warning);
+    }
+
+    [Fact]
     public void 種類とその他の複数選択を別レイアウトとして識別する()
     {
         var typeDefinition = BuiltInFieldCatalog.All.Single(

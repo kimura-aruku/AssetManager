@@ -155,6 +155,7 @@ public sealed class FieldEditorViewModel : ObservableObject
     private DateTime? _selectedDate;
     private TargetPathKind _targetPathKind = TargetPathKind.File;
     private string? _warning;
+    private bool? _isUrlFormatValid;
     private bool _isDirty;
     private bool _isLoading;
     private bool _showsLicenseConditionGroup;
@@ -174,6 +175,7 @@ public sealed class FieldEditorViewModel : ObservableObject
         AddListEntryCommand = new RelayCommand(AddListEntry, () => IsList);
         RemoveListEntryCommand = new RelayCommand(RemoveListEntry, () => IsList && Entries.Count > 1);
         Load(value);
+        ValidateUrlInput();
     }
 
     public FieldDefinition Definition { get; }
@@ -299,7 +301,15 @@ public sealed class FieldEditorViewModel : ObservableObject
             if (SetProperty(ref _text, value))
             {
                 MarkDirty();
-                ValidatePreview();
+                if (IsUrl)
+                {
+                    ClearUrlValidation();
+                }
+                else
+                {
+                    ValidatePreview();
+                }
+
                 RelayCommand.RefreshCanExecute();
             }
         }
@@ -359,10 +369,44 @@ public sealed class FieldEditorViewModel : ObservableObject
         private set => SetProperty(ref _warning, value);
     }
 
+    public bool ShowsValidUrlIndicator => _isUrlFormatValid is true;
+
+    public bool ShowsInvalidUrlIndicator => _isUrlFormatValid is false;
+
     public bool IsDirty
     {
         get => _isDirty;
         private set => SetProperty(ref _isDirty, value);
+    }
+
+    public void ValidateUrlInput()
+    {
+        if (!IsUrl && !IsTitledUrlList)
+        {
+            return;
+        }
+
+        Warning = null;
+        var hasInput = IsUrl
+            ? !string.IsNullOrWhiteSpace(Text)
+            : Entries.Any(entry => !string.IsNullOrWhiteSpace(entry.PrimaryText)
+                || !string.IsNullOrWhiteSpace(entry.SecondaryText));
+        if (!hasInput)
+        {
+            SetUrlFormatValidity(null);
+            return;
+        }
+
+        try
+        {
+            _ = CreateValue();
+            SetUrlFormatValidity(true);
+        }
+        catch (Exception exception) when (exception is DomainValidationException or FormatException)
+        {
+            Warning = exception.Message;
+            SetUrlFormatValidity(false);
+        }
     }
 
     public FieldValue? CreateValue()
@@ -514,7 +558,15 @@ public sealed class FieldEditorViewModel : ObservableObject
     private void OnEntryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         MarkDirty();
-        ValidatePreview();
+        if (IsTitledUrlList)
+        {
+            ClearUrlValidation();
+        }
+        else
+        {
+            ValidatePreview();
+        }
+
         RelayCommand.RefreshCanExecute();
     }
 
@@ -536,7 +588,15 @@ public sealed class FieldEditorViewModel : ObservableObject
         entry.PropertyChanged -= OnEntryPropertyChanged;
         Entries.RemoveAt(Entries.Count - 1);
         MarkDirty();
-        ValidatePreview();
+        if (IsTitledUrlList)
+        {
+            ClearUrlValidation();
+        }
+        else
+        {
+            ValidatePreview();
+        }
+
         RelayCommand.RefreshCanExecute();
     }
 
@@ -618,17 +678,6 @@ public sealed class FieldEditorViewModel : ObservableObject
                 Warning = exception.Message;
             }
         }
-        else if (Definition.Type is FieldType.Url or FieldType.TitledUrlList)
-        {
-            try
-            {
-                _ = CreateValue();
-            }
-            catch (Exception exception) when (exception is DomainValidationException or FormatException)
-            {
-                Warning = exception.Message;
-            }
-        }
         else if (Definition.Type is FieldType.FilePath or FieldType.FolderPath or FieldType.TargetPath
                  && !System.IO.Path.IsPathFullyQualified(text))
         {
@@ -641,6 +690,24 @@ public sealed class FieldEditorViewModel : ObservableObject
         {
             Warning = "各パスにはローカルドライブの絶対パスを入力してください。";
         }
+    }
+
+    private void ClearUrlValidation()
+    {
+        Warning = null;
+        SetUrlFormatValidity(null);
+    }
+
+    private void SetUrlFormatValidity(bool? value)
+    {
+        if (_isUrlFormatValid == value)
+        {
+            return;
+        }
+
+        _isUrlFormatValid = value;
+        OnPropertyChanged(nameof(ShowsValidUrlIndicator));
+        OnPropertyChanged(nameof(ShowsInvalidUrlIndicator));
     }
 
     private static decimal ParseNumber(string value)
