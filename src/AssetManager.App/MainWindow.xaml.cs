@@ -161,18 +161,6 @@ public partial class MainWindow : Window
         UpdateViewModelSelection();
     }
 
-    private void OnTargetPathSelectClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { ContextMenu: { } menu } button)
-        {
-            return;
-        }
-
-        menu.PlacementTarget = button;
-        menu.Placement = PlacementMode.Bottom;
-        menu.IsOpen = true;
-    }
-
     private void OnUrlInputLostFocus(object sender, RoutedEventArgs e)
     {
         var current = sender as DependencyObject;

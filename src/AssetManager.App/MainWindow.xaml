@@ -539,17 +539,7 @@
                               MinHeight="30"
                               Style="{StaticResource SecondaryButtonStyle}"
                               Content="選択"
-                              Click="OnTargetPathSelectClick"
-                              Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
-                        <Button.ContextMenu>
-                          <ContextMenu>
-                            <MenuItem Header="ファイルを選択"
-                                      Command="{Binding PlacementTarget.Tag.PickTargetFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                            <MenuItem Header="フォルダーを選択"
-                                      Command="{Binding PlacementTarget.Tag.PickTargetFolderCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                          </ContextMenu>
-                        </Button.ContextMenu>
-                      </Button>
+                              Command="{Binding DataContext.PickTargetCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
                     </Grid>
                     <ItemsControl Visibility="{Binding IsStringList, Converter={StaticResource BooleanToVisibilityConverter}}"
                                   ItemsSource="{Binding Entries}">

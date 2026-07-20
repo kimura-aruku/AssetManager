@@ -97,6 +97,30 @@ public sealed class WindowsPathTests
     }
 
     [Fact]
+    public void UnifiedTargetPickerAcceptsFileOrFolder()
+    {
+        var fileSystem = new FakeFileSystem
+        {
+            ExistingKinds =
+            {
+                [@"C:\Assets\file.png"] = PathEntryKind.File,
+                [@"C:\Assets\Folder"] = PathEntryKind.Folder,
+            },
+        };
+        var picker = new FakePicker { FileOrFolderResult = @"C:\Assets\file.png" };
+        var service = new PathRegistrationService(fileSystem, picker);
+
+        var file = service.PickTarget();
+        picker.FileOrFolderResult = @"C:\Assets\Folder";
+        var folder = service.PickTarget();
+
+        Assert.Equal(TargetPathKind.File, file!.Kind);
+        Assert.Equal(@"C:\Assets\file.png", file.Path);
+        Assert.Equal(TargetPathKind.Folder, folder!.Kind);
+        Assert.Equal(@"C:\Assets\Folder", folder.Path);
+    }
+
+    [Fact]
     public void AuxiliaryPickerReturnsNormalizedSelectedPath()
     {
         var fileSystem = new FakeFileSystem
@@ -115,9 +139,13 @@ public sealed class WindowsPathTests
 
     private sealed class FakePicker : IWindowsPathPicker
     {
+        public string? FileOrFolderResult { get; set; }
+
         public string? FileResult { get; set; }
 
         public string? FolderResult { get; set; }
+
+        public string? PickFileOrFolder(string title) => FileOrFolderResult;
 
         public string? PickFile(string title) => FileResult;
 

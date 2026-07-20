@@ -68,6 +68,8 @@ public interface IWindowsPathFileSystem
 
 public interface IWindowsPathPicker
 {
+    string? PickFileOrFolder(string title);
+
     string? PickFile(string title);
 
     string? PickFolder(string title);

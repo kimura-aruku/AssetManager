@@ -71,8 +71,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         PasteSelectionCommand = new AsyncRelayCommand(
             PasteSelectionAsync,
             () => _selectedGridRows.Count > 0 && _selectedGridFields.Count > 0);
-        PickTargetFileCommand = new RelayCommand(() => PickTarget(isFolder: false));
-        PickTargetFolderCommand = new RelayCommand(() => PickTarget(isFolder: true));
+        PickTargetCommand = new RelayCommand(PickTarget);
         PickFieldPathCommand = new RelayCommand<FieldEditorViewModel>(
             PickFieldPath,
             editor => editor.IsAuxiliaryPath);
@@ -201,9 +200,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public ICommand PasteSelectionCommand { get; }
 
-    public ICommand PickTargetFileCommand { get; }
-
-    public ICommand PickTargetFolderCommand { get; }
+    public ICommand PickTargetCommand { get; }
 
     public ICommand PickFieldPathCommand { get; }
 
@@ -679,13 +676,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
-    private void PickTarget(bool isFolder)
+    private void PickTarget()
     {
         try
         {
-            var path = isFolder
-                ? _runtime.PathRegistration.PickTargetFolder()
-                : _runtime.PathRegistration.PickTargetFile();
+            var path = _runtime.PathRegistration.PickTarget();
             if (path is null)
             {
                 return;
