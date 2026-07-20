@@ -3,6 +3,7 @@ using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
 using AssetManager.Domain.Records;
 using AssetManager.Application.History;
+using AssetManager.Domain.Licensing;
 
 namespace AssetManager.Application.Data;
 
@@ -11,7 +12,10 @@ public sealed record AssetManagerDataSnapshot(
     IReadOnlyList<AssetTypeDefinition> AssetTypes,
     IReadOnlyList<TagCategoryDefinition> TagCategories,
     IReadOnlyList<TagDefinition> Tags,
-    IReadOnlyList<AssetRecord> Records);
+    IReadOnlyList<AssetRecord> Records)
+{
+    public IReadOnlyList<LicensePresetDefinition> LicensePresets { get; init; } = [];
+}
 
 public interface IAssetManagerDataStore
 {
@@ -37,6 +41,11 @@ public interface IAssetManagerDataStore
 
     Task SaveAssetTypesAsync(
         IReadOnlyList<AssetTypeDefinition> assetTypes,
+        CancellationToken cancellationToken = default);
+
+    Task SaveLicensePresetsAsync(
+        IReadOnlyList<LicensePresetDefinition> licensePresets,
+        IReadOnlyList<FieldDefinition> fieldDefinitions,
         CancellationToken cancellationToken = default);
 
     Task SaveTagsAsync(

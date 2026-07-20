@@ -32,6 +32,27 @@ public sealed record AssetTypesDocument(
     int SchemaVersion,
     IReadOnlyList<AssetTypeDocument> AssetTypes);
 
+public sealed record LicenseTermsDocument(
+    bool CreditRequired,
+    bool LinkRequired,
+    bool LogoRequired,
+    bool CommercialUseAllowed,
+    bool ModificationAllowed,
+    bool RedistributionAllowed,
+    bool AdultUseAllowed,
+    bool GenerativeAiUseAllowed,
+    bool ConditionsUnknown,
+    bool NeedsReview);
+
+public sealed record LicensePresetDocument(
+    string Id,
+    string Name,
+    LicenseTermsDocument Terms);
+
+public sealed record LicensePresetsDocument(
+    int SchemaVersion,
+    IReadOnlyList<LicensePresetDocument> LicensePresets);
+
 public sealed record TagCategoryDocument(string Id, string Name);
 
 public sealed record TagDocument(

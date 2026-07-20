@@ -3,6 +3,7 @@ using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Common;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
+using AssetManager.Domain.Licensing;
 using AssetManager.Domain.Values;
 
 namespace AssetManager.Application.Catalog;
@@ -90,6 +91,72 @@ public sealed class CatalogApplicationService(IAssetManagerDataStore store)
             snapshot.AssetTypes.Append(definition).ToArray(),
             cancellationToken).ConfigureAwait(false);
         return definition;
+    }
+
+    public async Task<LicensePresetDefinition> AddLicensePresetAsync(
+        string name,
+        LicenseTerms terms,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(terms);
+        var snapshot = await _store.LoadAsync(cancellationToken).ConfigureAwait(false);
+        EnsureUniqueLicensePresetName(snapshot.LicensePresets, name);
+        var preset = new LicensePresetDefinition(
+            new LicensePresetId($"license-preset.{Guid.CreateVersion7():D}"),
+            name,
+            terms);
+        var updated = snapshot.LicensePresets.Append(preset).ToArray();
+        await SaveLicensePresetsAsync(snapshot.FieldDefinitions, updated, cancellationToken)
+            .ConfigureAwait(false);
+        return preset;
+    }
+
+    public async Task<LicensePresetDefinition> UpdateLicensePresetAsync(
+        LicensePresetId id,
+        string name,
+        LicenseTerms terms,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(terms);
+        var snapshot = await _store.LoadAsync(cancellationToken).ConfigureAwait(false);
+        if (snapshot.LicensePresets.All(preset => preset.Id != id))
+        {
+            throw new KeyNotFoundException($"定型ライセンス'{id}'が見つかりません。");
+        }
+
+        EnsureUniqueLicensePresetName(snapshot.LicensePresets, name, id);
+        var updatedPreset = new LicensePresetDefinition(id, name, terms);
+        var updated = snapshot.LicensePresets
+            .Select(preset => preset.Id == id ? updatedPreset : preset)
+            .ToArray();
+        await SaveLicensePresetsAsync(snapshot.FieldDefinitions, updated, cancellationToken)
+            .ConfigureAwait(false);
+        return updatedPreset;
+    }
+
+    public async Task DeleteLicensePresetAsync(
+        LicensePresetId id,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _store.LoadAsync(cancellationToken).ConfigureAwait(false);
+        if (snapshot.LicensePresets.All(preset => preset.Id != id))
+        {
+            throw new KeyNotFoundException($"定型ライセンス'{id}'が見つかりません。");
+        }
+
+        if (snapshot.Records.Any(record => string.Equals(
+                record.GetValue<SingleSelectionFieldValue>(BuiltInFieldIds.LicensePreset)?.Value.Value,
+                id.Value,
+                StringComparison.Ordinal)))
+        {
+            throw new CatalogItemInUseException("レコードで使用中の定型ライセンスは削除できません。");
+        }
+
+        var updated = snapshot.LicensePresets.Where(preset => preset.Id != id).ToArray();
+        await SaveLicensePresetsAsync(snapshot.FieldDefinitions, updated, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task<AssetTypeDefinition> UpdateAssetTypeAsync(
@@ -289,6 +356,38 @@ public sealed class CatalogApplicationService(IAssetManagerDataStore store)
         {
             throw new DomainValidationException($"購入／入手元'{name}'は既に登録されています。", nameof(name));
         }
+    }
+
+    private static void EnsureUniqueLicensePresetName(
+        IEnumerable<LicensePresetDefinition> presets,
+        string name,
+        LicensePresetId? exceptId = null)
+    {
+        var normalizedName = name.Trim();
+        if (presets.Any(preset => preset.Id != exceptId
+                && string.Equals(preset.Name, normalizedName, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new DomainValidationException(
+                $"定型ライセンス'{normalizedName}'は既に登録されています。",
+                nameof(name));
+        }
+    }
+
+    private Task SaveLicensePresetsAsync(
+        IReadOnlyList<FieldDefinition> definitions,
+        IReadOnlyList<LicensePresetDefinition> licensePresets,
+        CancellationToken cancellationToken)
+    {
+        var definition = definitions.FirstOrDefault(field => field.Id == BuiltInFieldIds.LicensePreset)
+            ?? throw new KeyNotFoundException("定型ライセンスカラムが見つかりません。");
+        var options = licensePresets.Select(preset => new SelectionOption(
+            new SelectionOptionId(preset.Id.Value),
+            preset.Name));
+        var updatedDefinition = definition.SetSelectionOptions(options);
+        return _store.SaveLicensePresetsAsync(
+            licensePresets,
+            definitions.Select(field => field.Id == updatedDefinition.Id ? updatedDefinition : field).ToArray(),
+            cancellationToken);
     }
 
     private Task SaveAcquisitionSourceDefinitionAsync(

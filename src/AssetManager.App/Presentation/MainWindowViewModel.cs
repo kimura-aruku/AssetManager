@@ -27,6 +27,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly Dictionary<AssetTypeId, string> _typeNames = [];
     private readonly Dictionary<TagId, string> _tagNames = [];
     private readonly List<AssetTypeDefinition> _assetTypes = [];
+    private readonly List<LicensePresetDefinition> _licensePresets = [];
+    private LicensePresetInputCoordinator? _licensePresetCoordinator;
     private RecordSearchSession? _searchSession;
     private RecordRowViewModel? _selectedRecord;
     private SavedSearch? _selectedSavedSearch;
@@ -262,6 +264,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _licensePresetCoordinator?.Dispose();
+        _licensePresetCoordinator = null;
         _pathCheckCancellation?.Cancel();
         _pathCheckCancellation?.Dispose();
         _pathCheckCancellation = null;
@@ -301,6 +305,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             _typeNames[type.Id] = type.Name;
             _assetTypes.Add(type);
         }
+
+        _licensePresets.Clear();
+        _licensePresets.AddRange(snapshot.LicensePresets);
 
         _tagNames.Clear();
         foreach (var tag in snapshot.Tags)
@@ -445,6 +452,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private void LoadEditors(AssetRecord? record)
     {
+        _licensePresetCoordinator?.Dispose();
+        _licensePresetCoordinator = null;
         DetailFields.Clear();
         LicenseConditionFields.Clear();
         if (record is null && !_isDraft)
@@ -475,6 +484,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             LicenseConditionFields[0].ShowLicenseConditionGroup();
         }
+
+        RebuildLicensePresetCoordinator();
     }
 
     private async Task SaveRecordAsync()
@@ -853,6 +864,23 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             var options = searchField?.Options.Select(
                 option => new SelectableOptionViewModel(option.Id, option.Label)) ?? [];
             editor.ReplaceOptions(options);
+        }
+
+        RebuildLicensePresetCoordinator();
+    }
+
+    private void RebuildLicensePresetCoordinator()
+    {
+        _licensePresetCoordinator?.Dispose();
+        _licensePresetCoordinator = null;
+        var presetEditor = DetailFields.FirstOrDefault(
+            editor => editor.Definition.Id == BuiltInFieldIds.LicensePreset);
+        if (presetEditor is not null)
+        {
+            _licensePresetCoordinator = new LicensePresetInputCoordinator(
+                presetEditor,
+                LicenseConditionFields,
+                _licensePresets);
         }
     }
 

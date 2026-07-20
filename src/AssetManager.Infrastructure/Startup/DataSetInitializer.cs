@@ -154,6 +154,14 @@ public sealed class DataSetInitializer : IStartupInitializer
             created = true;
         }
 
+        if (!File.Exists(layout.LicensePresetsFile))
+        {
+            await new LicensePresetRepository(_store)
+                .SaveAsync(layout, [], cancellationToken)
+                .ConfigureAwait(false);
+            created = true;
+        }
+
         if (!File.Exists(layout.TagsFile))
         {
             await new TagRepository(_store)
@@ -198,6 +206,7 @@ public sealed class DataSetInitializer : IStartupInitializer
             new ManifestRepository(_store),
             new FieldDefinitionRepository(_store),
             new AssetTypeRepository(_store),
+            new LicensePresetRepository(_store),
             new TagRepository(_store),
             new SettingsRepository(_store),
             new ViewSettingsRepository(_store),

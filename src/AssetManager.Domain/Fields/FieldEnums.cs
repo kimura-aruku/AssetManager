@@ -50,6 +50,7 @@ public enum SystemRole
     OrderNumber,
     ReceiptPath,
     PurchaseAccount,
+    LicensePreset,
     CreditRequired,
     LinkRequired,
     LogoRequired,

@@ -1,9 +1,11 @@
 using System.Text.Json;
 using AssetManager.Application.Fields;
+using AssetManager.Application.Catalog;
 using AssetManager.Application.Records;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
 using AssetManager.Domain.Records;
+using AssetManager.Domain.Licensing;
 using AssetManager.Domain.Values;
 using AssetManager.IntegrationTests.Persistence;
 using AssetManager.Infrastructure.Operations;
@@ -88,6 +90,27 @@ public sealed class JsonAssetManagerDataStoreTests
         Assert.Equal(FieldType.Number, reloaded.FieldDefinitions.Single(item => item.Id == field.Id).Type);
         var value = reloaded.Records.Single(item => item.Id == record.Id).Values[field.Id];
         Assert.Equal(123.5m, Assert.IsType<NumberFieldValue>(value).Value);
+        Assert.Empty(Directory.EnumerateDirectories(layout.TransactionsDirectory));
+    }
+
+    [Fact]
+    public async Task LicensePresetAndFieldOptionArePersistedTogether()
+    {
+        using var temporary = new TemporaryDirectory();
+        var (layout, store) = await CreateStoreAsync(temporary);
+        var service = new CatalogApplicationService(store);
+
+        var preset = await service.AddLicensePresetAsync(
+            "Standard License",
+            new LicenseTerms(CommercialUseAllowed: true, ModificationAllowed: true));
+
+        var reloaded = await new JsonAssetManagerDataStore(layout).LoadAsync();
+        var savedPreset = Assert.Single(reloaded.LicensePresets);
+        var option = Assert.Single(reloaded.FieldDefinitions.Single(
+            field => field.Id == BuiltInFieldIds.LicensePreset).Options);
+        Assert.Equal(preset.Id, savedPreset.Id);
+        Assert.Equal(preset.Id.Value, option.Id.Value);
+        Assert.Equal(preset.Name, option.Label);
         Assert.Empty(Directory.EnumerateDirectories(layout.TransactionsDirectory));
     }
 

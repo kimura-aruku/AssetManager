@@ -186,6 +186,7 @@ public sealed class DataRootMigrationService
             || copied.RecordLoadResult.Repairs.Count > 0
             || source.Fields.Count != copied.Fields.Count
             || source.AssetTypes.Count != copied.AssetTypes.Count
+            || source.LicensePresets.Count != copied.LicensePresets.Count
             || source.Tags.Tags.Count != copied.Tags.Tags.Count
             || source.Tags.Categories.Count != copied.Tags.Categories.Count)
         {
@@ -203,6 +204,7 @@ public sealed class DataRootMigrationService
             new ManifestRepository(_store),
             new FieldDefinitionRepository(_store),
             new AssetTypeRepository(_store),
+            new LicensePresetRepository(_store),
             new TagRepository(_store),
             new SettingsRepository(_store),
             new ViewSettingsRepository(_store),

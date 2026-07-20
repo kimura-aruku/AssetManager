@@ -29,6 +29,7 @@ public static class BuiltInFieldCatalog
             BuiltIn(BuiltInFieldIds.OrderNumber, "注文番号", FieldType.Text, SystemRole.OrderNumber),
             BuiltIn(BuiltInFieldIds.ReceiptPath, "領収書パス", FieldType.FilePath, SystemRole.ReceiptPath),
             BuiltIn(BuiltInFieldIds.PurchaseAccount, "購入アカウント名", FieldType.Text, SystemRole.PurchaseAccount),
+            BuiltIn(BuiltInFieldIds.LicensePreset, "定型ライセンス", FieldType.SingleSelect, SystemRole.LicensePreset),
             BuiltIn(BuiltInFieldIds.CreditRequired, "クレジット必須", FieldType.Boolean, SystemRole.CreditRequired),
             BuiltIn(BuiltInFieldIds.LinkRequired, "リンク必須", FieldType.Boolean, SystemRole.LinkRequired),
             BuiltIn(BuiltInFieldIds.LogoRequired, "ロゴ必須", FieldType.Boolean, SystemRole.LogoRequired),

@@ -210,6 +210,13 @@ public sealed class FieldEditorViewModel : ObservableObject
             option.PropertyChanged += OnOptionPropertyChanged;
             Options.Add(option);
         }
+
+        if (IsSingleOption
+            && SelectedOptionId is { } selectedId
+            && Options.All(option => option.Id != selectedId))
+        {
+            SelectedOptionId = null;
+        }
     }
 
     public bool IsBoolean => Definition.Type == FieldType.Boolean;

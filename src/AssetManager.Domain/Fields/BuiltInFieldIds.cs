@@ -25,6 +25,7 @@ public static class BuiltInFieldIds
     public static readonly FieldId OrderNumber = new("builtin.orderNumber");
     public static readonly FieldId ReceiptPath = new("builtin.receiptPath");
     public static readonly FieldId PurchaseAccount = new("builtin.purchaseAccount");
+    public static readonly FieldId LicensePreset = new("builtin.licensePreset");
     public static readonly FieldId CreditRequired = new("builtin.creditRequired");
     public static readonly FieldId LinkRequired = new("builtin.linkRequired");
     public static readonly FieldId LogoRequired = new("builtin.logoRequired");

@@ -4,6 +4,7 @@ using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
 using AssetManager.Domain.Records;
+using AssetManager.Domain.Licensing;
 using AssetManager.Infrastructure.Persistence;
 using AssetManager.Infrastructure.Persistence.Json;
 using AssetManager.Infrastructure.Persistence.Repositories;
@@ -17,6 +18,7 @@ public sealed class JsonAssetManagerDataStore : IAssetManagerDataStore
     private readonly AtomicJsonFileStore _fileStore;
     private readonly FieldDefinitionRepository _fields;
     private readonly AssetTypeRepository _assetTypes;
+    private readonly LicensePresetRepository _licensePresets;
     private readonly TagRepository _tags;
     private readonly RecordRepository _records;
     private readonly JsonTransactionCoordinator _transactions;
@@ -29,6 +31,7 @@ public sealed class JsonAssetManagerDataStore : IAssetManagerDataStore
         _fileStore = fileStore ?? new AtomicJsonFileStore();
         _fields = new FieldDefinitionRepository(_fileStore);
         _assetTypes = new AssetTypeRepository(_fileStore);
+        _licensePresets = new LicensePresetRepository(_fileStore);
         _tags = new TagRepository(_fileStore);
         _records = new RecordRepository(_fileStore);
         _transactions = new JsonTransactionCoordinator(_fileStore);
@@ -39,14 +42,19 @@ public sealed class JsonAssetManagerDataStore : IAssetManagerDataStore
     {
         var definitions = await _fields.LoadAsync(_layout, cancellationToken).ConfigureAwait(false);
         var assetTypes = await _assetTypes.LoadAsync(_layout, cancellationToken).ConfigureAwait(false);
+        var licensePresets = await _licensePresets.LoadAsync(_layout, cancellationToken).ConfigureAwait(false);
         var tags = await _tags.LoadAsync(_layout, cancellationToken).ConfigureAwait(false);
         var records = await _records.LoadAllAsync(_layout, definitions, cancellationToken).ConfigureAwait(false);
+        LicensePresetRepository.ValidateFieldOptions(definitions, licensePresets);
         return new AssetManagerDataSnapshot(
             definitions,
             assetTypes,
             tags.Categories,
             tags.Tags,
-            records.Records.Select(item => item.Record).ToArray());
+            records.Records.Select(item => item.Record).ToArray())
+        {
+            LicensePresets = licensePresets,
+        };
     }
 
     public async Task SaveRecordAsync(
@@ -116,6 +124,25 @@ public sealed class JsonAssetManagerDataStore : IAssetManagerDataStore
         CancellationToken cancellationToken = default)
     {
         return _assetTypes.SaveAsync(_layout, assetTypes, cancellationToken);
+    }
+
+    public async Task SaveLicensePresetsAsync(
+        IReadOnlyList<LicensePresetDefinition> licensePresets,
+        IReadOnlyList<FieldDefinition> fieldDefinitions,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(licensePresets);
+        ArgumentNullException.ThrowIfNull(fieldDefinitions);
+        var changes = new[]
+        {
+            JsonFileChange.Create(
+                Path.GetRelativePath(_layout.RootDirectory, _layout.LicensePresetsFile),
+                LicensePresetRepository.CreateDocument(licensePresets)),
+            JsonFileChange.Create(
+                Path.GetRelativePath(_layout.RootDirectory, _layout.FieldsFile),
+                FieldDefinitionRepository.CreateDocument(fieldDefinitions)),
+        };
+        _ = await _transactions.ExecuteAsync(_layout, changes, cancellationToken).ConfigureAwait(false);
     }
 
     public Task SaveTagsAsync(

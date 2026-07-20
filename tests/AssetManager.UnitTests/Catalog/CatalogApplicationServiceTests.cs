@@ -3,6 +3,7 @@ using AssetManager.Application.Data;
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
+using AssetManager.Domain.Licensing;
 using AssetManager.Domain.Records;
 using AssetManager.Domain.Values;
 using AssetManager.UnitTests.Testing;
@@ -95,6 +96,70 @@ public sealed class CatalogApplicationServiceTests
     }
 
     [Fact]
+    public async Task LicensePresetCanBeAddedUpdatedAndDeleted()
+    {
+        var store = CreateStore();
+        var service = new CatalogApplicationService(store);
+        var added = await service.AddLicensePresetAsync(
+            "MIT",
+            new LicenseTerms(
+                CreditRequired: true,
+                CommercialUseAllowed: true,
+                ModificationAllowed: true,
+                RedistributionAllowed: true));
+
+        var updated = await service.UpdateLicensePresetAsync(
+            added.Id,
+            "MIT License",
+            added.Terms with { LinkRequired = true });
+
+        Assert.Equal("MIT License", updated.Name);
+        Assert.True(updated.Terms.LinkRequired);
+        Assert.Equal(
+            updated.Id.Value,
+            Assert.Single(store.Snapshot.FieldDefinitions.Single(
+                field => field.Id == BuiltInFieldIds.LicensePreset).Options).Id.Value);
+
+        await service.DeleteLicensePresetAsync(updated.Id);
+
+        Assert.Empty(store.Snapshot.LicensePresets);
+        Assert.Empty(store.Snapshot.FieldDefinitions.Single(
+            field => field.Id == BuiltInFieldIds.LicensePreset).Options);
+    }
+
+    [Fact]
+    public async Task UsedLicensePresetCannotBeDeleted()
+    {
+        var preset = new LicensePresetDefinition(
+            new LicensePresetId("license-preset.mit"),
+            "MIT",
+            new LicenseTerms(CommercialUseAllowed: true));
+        var option = new SelectionOption(new SelectionOptionId(preset.Id.Value), preset.Name);
+        var definitions = BuiltInFieldCatalog.All.Select(field =>
+            field.Id == BuiltInFieldIds.LicensePreset
+                ? field.SetSelectionOptions([option])
+                : field).ToArray();
+        var presetDefinition = definitions.Single(field => field.Id == BuiltInFieldIds.LicensePreset);
+        var record = AssetRecord.Create(TestTime).SetValue(
+            presetDefinition,
+            new SingleSelectionFieldValue(option.Id),
+            TestTime);
+        var store = new TestDataStore(new AssetManagerDataSnapshot(
+            definitions,
+            [],
+            [],
+            [],
+            [record])
+        {
+            LicensePresets = [preset],
+        });
+        var service = new CatalogApplicationService(store);
+
+        _ = await Assert.ThrowsAsync<CatalogItemInUseException>(
+            () => service.DeleteLicensePresetAsync(preset.Id));
+    }
+
+    [Fact]
     public async Task TagCategoryAndTagCanBeAddedEditedAndDeleted()
     {
         var store = CreateStore();
@@ -137,13 +202,17 @@ public sealed class CatalogApplicationServiceTests
         IReadOnlyList<AssetTypeDefinition>? assetTypes = null,
         IReadOnlyList<TagCategoryDefinition>? categories = null,
         IReadOnlyList<TagDefinition>? tags = null,
-        IReadOnlyList<AssetRecord>? records = null)
+        IReadOnlyList<AssetRecord>? records = null,
+        IReadOnlyList<LicensePresetDefinition>? licensePresets = null)
     {
         return new TestDataStore(new AssetManagerDataSnapshot(
             BuiltInFieldCatalog.All,
             assetTypes ?? [],
             categories ?? [],
             tags ?? [],
-            records ?? []));
+            records ?? [])
+        {
+            LicensePresets = licensePresets ?? [],
+        });
     }
 }

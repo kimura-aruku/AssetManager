@@ -35,6 +35,7 @@ public sealed class DataSetInitializerTests
         Assert.True(File.Exists(layout.ManifestFile));
         Assert.True(File.Exists(layout.FieldsFile));
         Assert.True(File.Exists(layout.AssetTypesFile));
+        Assert.True(File.Exists(layout.LicensePresetsFile));
         Assert.True(File.Exists(layout.TagsFile));
         Assert.True(File.Exists(layout.SettingsFile));
         Assert.True(File.Exists(layout.ViewsFile));
@@ -43,8 +44,10 @@ public sealed class DataSetInitializerTests
         Assert.Equal(7, progress.Values[^1].CompletedSteps);
 
         var types = await new AssetTypeRepository(new AtomicJsonFileStore()).LoadAsync(layout);
+        var licensePresets = await new LicensePresetRepository(new AtomicJsonFileStore()).LoadAsync(layout);
         var tags = await new TagRepository(new AtomicJsonFileStore()).LoadAsync(layout);
         Assert.Equal(8, types.Count);
+        Assert.Empty(licensePresets);
         Assert.Empty(tags.Categories);
         Assert.Empty(tags.Tags);
     }
@@ -178,7 +181,8 @@ public sealed class DataSetInitializerTests
         var legacyDefinitions = new List<FieldDefinition>();
         foreach (var definition in BuiltInFieldCatalog.All)
         {
-            if (definition.Id == BuiltInFieldIds.Overview)
+            if (definition.Id == BuiltInFieldIds.Overview
+                || definition.Id == BuiltInFieldIds.LicensePreset)
             {
                 continue;
             }
@@ -214,6 +218,7 @@ public sealed class DataSetInitializerTests
         Assert.Equal("概要", definitions[overviewIndex].Label);
         Assert.Equal("詳細", definitions[detailIndex].Label);
         Assert.DoesNotContain(definitions, definition => definition.Id == BuiltInFieldIds.Notes);
+        Assert.Contains(definitions, definition => definition.Id == BuiltInFieldIds.LicensePreset);
 
         var loaded = await new RecordRepository(fileStore).LoadAsync(
             layout,

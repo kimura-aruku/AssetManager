@@ -1,5 +1,6 @@
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Fields;
+using AssetManager.Domain.Licensing;
 using AssetManager.Infrastructure.Persistence.Migrations;
 using AssetManager.Infrastructure.Persistence.Models;
 using AssetManager.Infrastructure.Persistence.Recovery;
@@ -11,6 +12,7 @@ public sealed record DataSetSnapshot(
     ManifestDocument Manifest,
     IReadOnlyList<FieldDefinition> Fields,
     IReadOnlyList<AssetTypeDefinition> AssetTypes,
+    IReadOnlyList<LicensePresetDefinition> LicensePresets,
     TagCatalog Tags,
     AppSettingsDocument Settings,
     ViewSettingsDocument Views,
@@ -23,6 +25,7 @@ public sealed class DataSetLoader(
     ManifestRepository manifests,
     FieldDefinitionRepository fields,
     AssetTypeRepository assetTypes,
+    LicensePresetRepository licensePresets,
     TagRepository tags,
     SettingsRepository settings,
     ViewSettingsRepository views,
@@ -39,6 +42,8 @@ public sealed class DataSetLoader(
         var manifest = await manifests.LoadAsync(layout, cancellationToken).ConfigureAwait(false);
         var fieldDefinitions = await fields.LoadAsync(layout, cancellationToken).ConfigureAwait(false);
         var typeDefinitions = await assetTypes.LoadAsync(layout, cancellationToken).ConfigureAwait(false);
+        var presetDefinitions = await licensePresets.LoadAsync(layout, cancellationToken).ConfigureAwait(false);
+        LicensePresetRepository.ValidateFieldOptions(fieldDefinitions, presetDefinitions);
         var tagCatalog = await tags.LoadAsync(layout, cancellationToken).ConfigureAwait(false);
         var appSettings = await settings.LoadAsync(layout, cancellationToken).ConfigureAwait(false);
         var viewSettings = await views.LoadAsync(layout, cancellationToken).ConfigureAwait(false);
@@ -51,6 +56,7 @@ public sealed class DataSetLoader(
             manifest,
             fieldDefinitions,
             typeDefinitions,
+            presetDefinitions,
             tagCatalog,
             appSettings,
             viewSettings,

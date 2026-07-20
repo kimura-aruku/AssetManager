@@ -1,6 +1,7 @@
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
+using AssetManager.Domain.Licensing;
 using AssetManager.Infrastructure.Persistence;
 using AssetManager.Infrastructure.Persistence.Json;
 using AssetManager.Infrastructure.Persistence.Models;
@@ -32,6 +33,7 @@ public sealed class CoreRepositoryTests
         var store = new AtomicJsonFileStore();
         var fields = new FieldDefinitionRepository(store);
         var types = new AssetTypeRepository(store);
+        var licensePresets = new LicensePresetRepository(store);
         var tags = new TagRepository(store);
         var custom = FieldDefinition.CreateCustom(CustomFieldId.New(), "自由欄", FieldType.Text);
         var type = new AssetTypeDefinition(new AssetTypeId("type.bgm"), "BGM", ["wav"]);
@@ -41,16 +43,23 @@ public sealed class CoreRepositoryTests
             "ファンタジー",
             new TagColor("#123456"),
             category.Id);
+        var preset = new LicensePresetDefinition(
+            new LicensePresetId("license-preset.mit"),
+            "MIT",
+            new LicenseTerms(CommercialUseAllowed: true, ModificationAllowed: true));
 
         await fields.SaveAsync(layout, BuiltInFieldCatalog.All.Append(custom));
         await types.SaveAsync(layout, [type]);
+        await licensePresets.SaveAsync(layout, [preset]);
         await tags.SaveAsync(layout, new TagCatalog([category], [tag]));
 
         var loadedFields = await fields.LoadAsync(layout);
         var loadedTypes = await types.LoadAsync(layout);
+        var loadedPresets = await licensePresets.LoadAsync(layout);
         var loadedTags = await tags.LoadAsync(layout);
         Assert.Contains(loadedFields, field => field.Id == custom.Id);
         Assert.Equal(".wav", Assert.Single(loadedTypes).Extensions[0]);
+        Assert.True(Assert.Single(loadedPresets).Terms.CommercialUseAllowed);
         Assert.Equal(category.Id, Assert.Single(loadedTags.Tags).CategoryId);
     }
 

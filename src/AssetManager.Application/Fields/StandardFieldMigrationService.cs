@@ -15,8 +15,8 @@ public sealed class StandardFieldMigrationService(IAssetManagerDataStore store)
         var snapshot = await _store.LoadAsync(cancellationToken).ConfigureAwait(false);
         var currentDetail = snapshot.FieldDefinitions.FirstOrDefault(
             definition => definition.Id == BuiltInFieldIds.Description);
-        var needsMigration = snapshot.FieldDefinitions.All(
-                definition => definition.Id != BuiltInFieldIds.Overview)
+        var needsMigration = BuiltInFieldCatalog.All.Any(canonical =>
+                snapshot.FieldDefinitions.All(definition => definition.Id != canonical.Id))
             || currentDetail?.Label != "詳細"
             || snapshot.FieldDefinitions.Any(definition => definition.Id == BuiltInFieldIds.Notes);
         if (!needsMigration)

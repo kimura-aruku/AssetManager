@@ -1,6 +1,8 @@
 using AssetManager.App.Presentation;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Values;
+using AssetManager.Domain.Identifiers;
+using AssetManager.Domain.Licensing;
 
 namespace AssetManager.IntegrationTests.Presentation;
 
@@ -191,5 +193,52 @@ public sealed class FieldEditorViewModelTests
         Assert.True(licenseEditors[0].IsDetailItemVisible);
         Assert.True(favoriteEditor.IsStandaloneBoolean);
         Assert.True(favoriteEditor.IsDetailItemVisible);
+    }
+
+    [Fact]
+    public void 定型ライセンス選択は条件を入力し手動変更時に選択を解除する()
+    {
+        var preset = new LicensePresetDefinition(
+            new LicensePresetId("license-preset.test"),
+            "テスト用",
+            new LicenseTerms(
+                CreditRequired: true,
+                CommercialUseAllowed: true,
+                ModificationAllowed: true,
+                GenerativeAiUseAllowed: true));
+        var option = new SelectionOption(new SelectionOptionId(preset.Id.Value), preset.Name);
+        var presetDefinition = BuiltInFieldCatalog.All
+            .Single(field => field.Id == BuiltInFieldIds.LicensePreset)
+            .SetSelectionOptions([option]);
+        var presetEditor = new FieldEditorViewModel(
+            presetDefinition,
+            value: null,
+            [new SelectableOptionViewModel(option.Id.Value, option.Label)]);
+        var conditionEditors = BuiltInFieldCatalog.All
+            .Select(definition => new FieldEditorViewModel(definition, value: null))
+            .Where(editor => editor.IsLicenseCondition)
+            .ToArray();
+        using var coordinator = new LicensePresetInputCoordinator(
+            presetEditor,
+            conditionEditors,
+            [preset]);
+
+        presetEditor.SelectedOptionId = preset.Id.Value;
+
+        Assert.True(GetCondition(SystemRole.CreditRequired).BooleanValue);
+        Assert.True(GetCondition(SystemRole.CommercialUseAllowed).BooleanValue);
+        Assert.True(GetCondition(SystemRole.ModificationAllowed).BooleanValue);
+        Assert.True(GetCondition(SystemRole.GenerativeAiUseAllowed).BooleanValue);
+        Assert.False(GetCondition(SystemRole.LinkRequired).BooleanValue);
+        Assert.Equal(preset.Id.Value, presetEditor.SelectedOptionId);
+
+        GetCondition(SystemRole.LinkRequired).BooleanValue = true;
+
+        Assert.Null(presetEditor.SelectedOptionId);
+
+        FieldEditorViewModel GetCondition(SystemRole role)
+        {
+            return conditionEditors.Single(editor => editor.Definition.SystemRole == role);
+        }
     }
 }
