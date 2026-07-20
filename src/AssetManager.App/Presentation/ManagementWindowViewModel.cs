@@ -31,16 +31,6 @@ public sealed class ManagementWindowViewModel : ObservableObject
     private string _assetTypeExtensions = string.Empty;
     private string _acquisitionSourceName = string.Empty;
     private string _licensePresetName = string.Empty;
-    private bool _presetCreditRequired;
-    private bool _presetLinkRequired;
-    private bool _presetLogoRequired;
-    private bool _presetCommercialUseAllowed;
-    private bool _presetModificationAllowed;
-    private bool _presetRedistributionAllowed;
-    private bool _presetAdultUseAllowed;
-    private bool _presetGenerativeAiUseAllowed;
-    private bool _presetConditionsUnknown;
-    private bool _presetNeedsReview;
     private string _categoryName = string.Empty;
     private string _tagName = string.Empty;
     private string _tagColor = "#4F7CAC";
@@ -93,6 +83,9 @@ public sealed class ManagementWindowViewModel : ObservableObject
     public ObservableCollection<SelectionOption> AcquisitionSources { get; } = [];
 
     public ObservableCollection<LicensePresetDefinition> LicensePresets { get; } = [];
+
+    public ObservableCollection<LicensePresetConditionViewModel> LicensePresetConditions { get; } =
+        new(LicenseConditionCatalog.All.Select(condition => new LicensePresetConditionViewModel(condition)));
 
     public ObservableCollection<TagCategoryDefinition> Categories { get; } = [];
 
@@ -250,66 +243,6 @@ public sealed class ManagementWindowViewModel : ObservableObject
     {
         get => _licensePresetName;
         set { if (SetProperty(ref _licensePresetName, value)) RelayCommand.RefreshCanExecute(); }
-    }
-
-    public bool PresetCreditRequired
-    {
-        get => _presetCreditRequired;
-        set => SetProperty(ref _presetCreditRequired, value);
-    }
-
-    public bool PresetLinkRequired
-    {
-        get => _presetLinkRequired;
-        set => SetProperty(ref _presetLinkRequired, value);
-    }
-
-    public bool PresetLogoRequired
-    {
-        get => _presetLogoRequired;
-        set => SetProperty(ref _presetLogoRequired, value);
-    }
-
-    public bool PresetCommercialUseAllowed
-    {
-        get => _presetCommercialUseAllowed;
-        set => SetProperty(ref _presetCommercialUseAllowed, value);
-    }
-
-    public bool PresetModificationAllowed
-    {
-        get => _presetModificationAllowed;
-        set => SetProperty(ref _presetModificationAllowed, value);
-    }
-
-    public bool PresetRedistributionAllowed
-    {
-        get => _presetRedistributionAllowed;
-        set => SetProperty(ref _presetRedistributionAllowed, value);
-    }
-
-    public bool PresetAdultUseAllowed
-    {
-        get => _presetAdultUseAllowed;
-        set => SetProperty(ref _presetAdultUseAllowed, value);
-    }
-
-    public bool PresetGenerativeAiUseAllowed
-    {
-        get => _presetGenerativeAiUseAllowed;
-        set => SetProperty(ref _presetGenerativeAiUseAllowed, value);
-    }
-
-    public bool PresetConditionsUnknown
-    {
-        get => _presetConditionsUnknown;
-        set => SetProperty(ref _presetConditionsUnknown, value);
-    }
-
-    public bool PresetNeedsReview
-    {
-        get => _presetNeedsReview;
-        set => SetProperty(ref _presetNeedsReview, value);
     }
 
     public string CategoryName
@@ -710,30 +643,31 @@ public sealed class ManagementWindowViewModel : ObservableObject
     private LicenseTerms CreatePresetTerms()
     {
         return new LicenseTerms(
-            PresetCreditRequired,
-            PresetLinkRequired,
-            PresetLogoRequired,
-            PresetCommercialUseAllowed,
-            PresetModificationAllowed,
-            PresetRedistributionAllowed,
-            PresetAdultUseAllowed,
-            PresetGenerativeAiUseAllowed,
-            PresetConditionsUnknown,
-            PresetNeedsReview);
+            ReadPresetCondition(SystemRole.CommercialUseAllowed),
+            ReadPresetCondition(SystemRole.ModificationAllowed),
+            ReadPresetCondition(SystemRole.ProductEmbeddingAllowed),
+            ReadPresetCondition(SystemRole.OriginalDataRedistributionAllowed),
+            ReadPresetCondition(SystemRole.CreditDisplayRequired),
+            ReadPresetCondition(SystemRole.CopyrightNoticeRetentionRequired),
+            ReadPresetCondition(SystemRole.LicenseTextAttachmentRequired),
+            ReadPresetCondition(SystemRole.SameLicenseRequired),
+            ReadPresetCondition(SystemRole.AiTrainingAllowed),
+            ReadPresetCondition(SystemRole.GenerativeAiInputAllowed),
+            ReadPresetCondition(SystemRole.EngineRestrictionExists),
+            ReadPresetCondition(SystemRole.LicenseReviewRequired));
     }
 
     private void ApplyPresetTerms(LicenseTerms terms)
     {
-        PresetCreditRequired = terms.CreditRequired;
-        PresetLinkRequired = terms.LinkRequired;
-        PresetLogoRequired = terms.LogoRequired;
-        PresetCommercialUseAllowed = terms.CommercialUseAllowed;
-        PresetModificationAllowed = terms.ModificationAllowed;
-        PresetRedistributionAllowed = terms.RedistributionAllowed;
-        PresetAdultUseAllowed = terms.AdultUseAllowed;
-        PresetGenerativeAiUseAllowed = terms.GenerativeAiUseAllowed;
-        PresetConditionsUnknown = terms.ConditionsUnknown;
-        PresetNeedsReview = terms.NeedsReview;
+        foreach (var condition in LicensePresetConditions)
+        {
+            condition.IsChecked = terms.GetValue(condition.Definition.SystemRole);
+        }
+    }
+
+    private bool ReadPresetCondition(SystemRole role)
+    {
+        return LicensePresetConditions.Single(condition => condition.Definition.SystemRole == role).IsChecked;
     }
 
     private void ClearCategoryForm()
@@ -762,5 +696,27 @@ public sealed class ManagementWindowViewModel : ObservableObject
         {
             target.Add(value);
         }
+    }
+}
+
+public sealed class LicensePresetConditionViewModel(LicenseConditionDefinition definition) : ObservableObject
+{
+    private bool _isChecked;
+
+    public LicenseConditionDefinition Definition { get; } = definition
+        ?? throw new ArgumentNullException(nameof(definition));
+
+    public string Label => Definition.Label;
+
+    public string Summary => Definition.Summary;
+
+    public string Description => Definition.Description;
+
+    public string ToolTip => Definition.ToolTip;
+
+    public bool IsChecked
+    {
+        get => _isChecked;
+        set => SetProperty(ref _isChecked, value);
     }
 }

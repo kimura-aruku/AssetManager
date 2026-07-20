@@ -33,16 +33,22 @@ public sealed record AssetTypesDocument(
     IReadOnlyList<AssetTypeDocument> AssetTypes);
 
 public sealed record LicenseTermsDocument(
-    bool CreditRequired,
-    bool LinkRequired,
-    bool LogoRequired,
-    bool CommercialUseAllowed,
-    bool ModificationAllowed,
-    bool RedistributionAllowed,
-    bool AdultUseAllowed,
-    bool GenerativeAiUseAllowed,
-    bool ConditionsUnknown,
-    bool NeedsReview);
+    bool CommercialUseAllowed = false,
+    bool ModificationAllowed = false,
+    bool ProductEmbeddingAllowed = false,
+    bool OriginalDataRedistributionAllowed = false,
+    bool CreditDisplayRequired = false,
+    bool CopyrightNoticeRetentionRequired = false,
+    bool LicenseTextAttachmentRequired = false,
+    bool SameLicenseRequired = false,
+    bool AiTrainingAllowed = false,
+    bool GenerativeAiInputAllowed = false,
+    bool EngineRestrictionExists = false,
+    bool NeedsReview = false,
+    // 旧形式の定型ライセンスを読み込むために保持し、新規保存時はnullとして省略する。
+    bool? CreditRequired = null,
+    bool? RedistributionAllowed = null,
+    bool? GenerativeAiUseAllowed = null);
 
 public sealed record LicensePresetDocument(
     string Id,

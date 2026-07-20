@@ -64,6 +64,39 @@ public sealed class CoreRepositoryTests
     }
 
     [Fact]
+    public async Task LegacyLicensePresetTermsAreMappedToNewConditions()
+    {
+        using var temporary = new TemporaryDirectory();
+        var layout = new DataRootLayout(temporary.Path);
+        layout.EnsureDirectories();
+        var store = new AtomicJsonFileStore();
+        var document = new LicensePresetsDocument(
+            1,
+            [
+                new LicensePresetDocument(
+                    "license-preset.legacy",
+                    "旧定型ライセンス",
+                    new LicenseTermsDocument(
+                        CommercialUseAllowed: true,
+                        ModificationAllowed: true,
+                        NeedsReview: true,
+                        CreditRequired: true,
+                        RedistributionAllowed: true,
+                        GenerativeAiUseAllowed: true)),
+            ]);
+        await store.SaveAsync(layout.LicensePresetsFile, document);
+
+        var preset = Assert.Single(await new LicensePresetRepository(store).LoadAsync(layout));
+
+        Assert.True(preset.Terms.CommercialUseAllowed);
+        Assert.True(preset.Terms.ModificationAllowed);
+        Assert.True(preset.Terms.CreditDisplayRequired);
+        Assert.True(preset.Terms.OriginalDataRedistributionAllowed);
+        Assert.True(preset.Terms.GenerativeAiInputAllowed);
+        Assert.True(preset.Terms.NeedsReview);
+    }
+
+    [Fact]
     public async Task CorruptCriticalDefinitionStopsLoading()
     {
         using var temporary = new TemporaryDirectory();

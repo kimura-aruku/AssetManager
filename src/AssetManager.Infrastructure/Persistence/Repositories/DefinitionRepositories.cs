@@ -259,15 +259,20 @@ public sealed class LicensePresetRepository(AtomicJsonFileStore store)
             new LicensePresetId(document.Id),
             document.Name,
             new LicenseTerms(
-                document.Terms.CreditRequired,
-                document.Terms.LinkRequired,
-                document.Terms.LogoRequired,
                 document.Terms.CommercialUseAllowed,
                 document.Terms.ModificationAllowed,
-                document.Terms.RedistributionAllowed,
-                document.Terms.AdultUseAllowed,
-                document.Terms.GenerativeAiUseAllowed,
-                document.Terms.ConditionsUnknown,
+                document.Terms.ProductEmbeddingAllowed,
+                document.Terms.OriginalDataRedistributionAllowed
+                    || document.Terms.RedistributionAllowed is true,
+                document.Terms.CreditDisplayRequired
+                    || document.Terms.CreditRequired is true,
+                document.Terms.CopyrightNoticeRetentionRequired,
+                document.Terms.LicenseTextAttachmentRequired,
+                document.Terms.SameLicenseRequired,
+                document.Terms.AiTrainingAllowed,
+                document.Terms.GenerativeAiInputAllowed
+                    || document.Terms.GenerativeAiUseAllowed is true,
+                document.Terms.EngineRestrictionExists,
                 document.Terms.NeedsReview));
     }
 
@@ -277,15 +282,17 @@ public sealed class LicensePresetRepository(AtomicJsonFileStore store)
             preset.Id.Value,
             preset.Name,
             new LicenseTermsDocument(
-                preset.Terms.CreditRequired,
-                preset.Terms.LinkRequired,
-                preset.Terms.LogoRequired,
                 preset.Terms.CommercialUseAllowed,
                 preset.Terms.ModificationAllowed,
-                preset.Terms.RedistributionAllowed,
-                preset.Terms.AdultUseAllowed,
-                preset.Terms.GenerativeAiUseAllowed,
-                preset.Terms.ConditionsUnknown,
+                preset.Terms.ProductEmbeddingAllowed,
+                preset.Terms.OriginalDataRedistributionAllowed,
+                preset.Terms.CreditDisplayRequired,
+                preset.Terms.CopyrightNoticeRetentionRequired,
+                preset.Terms.LicenseTextAttachmentRequired,
+                preset.Terms.SameLicenseRequired,
+                preset.Terms.AiTrainingAllowed,
+                preset.Terms.GenerativeAiInputAllowed,
+                preset.Terms.EngineRestrictionExists,
                 preset.Terms.NeedsReview));
     }
 }

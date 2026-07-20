@@ -98,7 +98,8 @@ public static class DomainModelValidator
         {
             if (!canonicalDefinitions.TryGetValue(definition.Id, out var canonical))
             {
-                if (IsLegacyNotesDefinition(definition))
+                if (IsLegacyNotesDefinition(definition)
+                    || IsLegacyLicenseConditionDefinition(definition))
                 {
                     continue;
                 }
@@ -112,7 +113,8 @@ public static class DomainModelValidator
 
             if (!HasCanonicalFixedDefinition(definition, canonical)
                 && !IsLegacyAcquisitionSourceDefinition(definition, canonical)
-                && !IsLegacyDescriptionDefinition(definition, canonical))
+                && !IsLegacyDescriptionDefinition(definition, canonical)
+                && !IsLegacyLicenseConditionDefinition(definition))
             {
                 issues.Add(new ValidationIssue(
                     ValidationIssueCode.InvalidBuiltInFieldDefinition,
@@ -146,6 +148,30 @@ public static class DomainModelValidator
             && definition.Label == "備考"
             && definition.Type == FieldType.MultilineText
             && definition.SystemRole == SystemRole.Notes
+            && !definition.MainTableRequired
+            && !definition.UserCanRename
+            && !definition.UserCanChangeType
+            && !definition.UserCanDelete;
+    }
+
+    private static bool IsLegacyLicenseConditionDefinition(FieldDefinition definition)
+    {
+        var expected = definition.Id switch
+        {
+            var id when id == BuiltInFieldIds.CreditDisplayRequired => ("クレジット必須", SystemRole.CreditRequired),
+            var id when id == BuiltInFieldIds.LinkRequired => ("リンク必須", SystemRole.LinkRequired),
+            var id when id == BuiltInFieldIds.LogoRequired => ("ロゴ必須", SystemRole.LogoRequired),
+            var id when id == BuiltInFieldIds.OriginalDataRedistributionAllowed => ("再配布可", SystemRole.RedistributionAllowed),
+            var id when id == BuiltInFieldIds.AdultUseAllowed => ("成人向け利用可", SystemRole.AdultUseAllowed),
+            var id when id == BuiltInFieldIds.GenerativeAiInputAllowed => ("生成AI利用可", SystemRole.GenerativeAiUseAllowed),
+            var id when id == BuiltInFieldIds.LicenseUnknown => ("条件不明", SystemRole.LicenseUnknown),
+            var id when id == BuiltInFieldIds.LicenseReviewRequired => ("要再確認", SystemRole.LicenseNeedsReview),
+            _ => default,
+        };
+        return expected != default
+            && definition.Label == expected.Item1
+            && definition.SystemRole == expected.Item2
+            && definition.Type == FieldType.Boolean
             && !definition.MainTableRequired
             && !definition.UserCanRename
             && !definition.UserCanChangeType

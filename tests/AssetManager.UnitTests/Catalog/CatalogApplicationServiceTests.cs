@@ -103,18 +103,18 @@ public sealed class CatalogApplicationServiceTests
         var added = await service.AddLicensePresetAsync(
             "MIT",
             new LicenseTerms(
-                CreditRequired: true,
                 CommercialUseAllowed: true,
                 ModificationAllowed: true,
-                RedistributionAllowed: true));
+                OriginalDataRedistributionAllowed: true,
+                CreditDisplayRequired: true));
 
         var updated = await service.UpdateLicensePresetAsync(
             added.Id,
             "MIT License",
-            added.Terms with { LinkRequired = true });
+            added.Terms with { LicenseTextAttachmentRequired = true });
 
         Assert.Equal("MIT License", updated.Name);
-        Assert.True(updated.Terms.LinkRequired);
+        Assert.True(updated.Terms.LicenseTextAttachmentRequired);
         Assert.Equal(
             updated.Id.Value,
             Assert.Single(store.Snapshot.FieldDefinitions.Single(

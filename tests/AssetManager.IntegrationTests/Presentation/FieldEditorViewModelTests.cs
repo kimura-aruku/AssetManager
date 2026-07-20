@@ -183,8 +183,14 @@ public sealed class FieldEditorViewModelTests
             field => field.Id == BuiltInFieldIds.Favorite);
         var favoriteEditor = new FieldEditorViewModel(favoriteDefinition, value: null);
 
-        Assert.Equal(10, licenseEditors.Length);
+        Assert.Equal(12, licenseEditors.Length);
         Assert.All(licenseEditors, editor => Assert.False(editor.IsStandaloneBoolean));
+        Assert.All(licenseEditors, editor => Assert.False(string.IsNullOrWhiteSpace(editor.LicenseConditionToolTip)));
+        Assert.Contains(
+            "営利目的の製品・サービスで利用できます。",
+            licenseEditors.Single(editor => editor.Definition.SystemRole == SystemRole.CommercialUseAllowed)
+                .LicenseConditionToolTip,
+            StringComparison.Ordinal);
         Assert.False(licenseEditors[0].IsDetailItemVisible);
 
         licenseEditors[0].ShowLicenseConditionGroup();
@@ -202,10 +208,10 @@ public sealed class FieldEditorViewModelTests
             new LicensePresetId("license-preset.test"),
             "テスト用",
             new LicenseTerms(
-                CreditRequired: true,
                 CommercialUseAllowed: true,
                 ModificationAllowed: true,
-                GenerativeAiUseAllowed: true));
+                CreditDisplayRequired: true,
+                GenerativeAiInputAllowed: true));
         var option = new SelectionOption(new SelectionOptionId(preset.Id.Value), preset.Name);
         var presetDefinition = BuiltInFieldCatalog.All
             .Single(field => field.Id == BuiltInFieldIds.LicensePreset)
@@ -225,14 +231,14 @@ public sealed class FieldEditorViewModelTests
 
         presetEditor.SelectedOptionId = preset.Id.Value;
 
-        Assert.True(GetCondition(SystemRole.CreditRequired).BooleanValue);
         Assert.True(GetCondition(SystemRole.CommercialUseAllowed).BooleanValue);
         Assert.True(GetCondition(SystemRole.ModificationAllowed).BooleanValue);
-        Assert.True(GetCondition(SystemRole.GenerativeAiUseAllowed).BooleanValue);
-        Assert.False(GetCondition(SystemRole.LinkRequired).BooleanValue);
+        Assert.True(GetCondition(SystemRole.CreditDisplayRequired).BooleanValue);
+        Assert.True(GetCondition(SystemRole.GenerativeAiInputAllowed).BooleanValue);
+        Assert.False(GetCondition(SystemRole.EngineRestrictionExists).BooleanValue);
         Assert.Equal(preset.Id.Value, presetEditor.SelectedOptionId);
 
-        GetCondition(SystemRole.LinkRequired).BooleanValue = true;
+        GetCondition(SystemRole.EngineRestrictionExists).BooleanValue = true;
 
         Assert.Null(presetEditor.SelectedOptionId);
 

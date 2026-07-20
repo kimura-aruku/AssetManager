@@ -7,6 +7,7 @@ using AssetManager.Infrastructure.Persistence.Repositories;
 using AssetManager.Infrastructure.Startup;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
+using AssetManager.Domain.Licensing;
 using AssetManager.Domain.Records;
 using AssetManager.Domain.Values;
 using System.Text.Json;
@@ -228,6 +229,73 @@ public sealed class DataSetInitializerTests
             $"既存の説明{Environment.NewLine}{Environment.NewLine}既存の備考",
             loaded.Record.Record.GetValue<MultilineTextFieldValue>(BuiltInFieldIds.Description)?.Value);
         Assert.False(loaded.Record.Record.Values.ContainsKey(BuiltInFieldIds.Notes));
+    }
+
+    [Fact]
+    public async Task RestartMigratesLegacyLicenseConditionsToTwelveConditions()
+    {
+        using var temporary = new TemporaryDirectory();
+        var paths = new AppDataPaths(temporary.Path);
+        var initializer = new DataSetInitializer(paths);
+        var firstResult = await initializer.InitializeAsync();
+        var layout = new DataRootLayout(firstResult.DataRoot);
+        var fileStore = new AtomicJsonFileStore();
+        var legacyCredit = FieldDefinition.CreateBuiltIn(
+            BuiltInFieldIds.CreditDisplayRequired,
+            "クレジット必須",
+            FieldType.Boolean,
+            SystemRole.CreditRequired);
+        var legacyGenerativeAi = FieldDefinition.CreateBuiltIn(
+            BuiltInFieldIds.GenerativeAiInputAllowed,
+            "生成AI利用可",
+            FieldType.Boolean,
+            SystemRole.GenerativeAiUseAllowed);
+        var legacyLink = FieldDefinition.CreateBuiltIn(
+            BuiltInFieldIds.LinkRequired,
+            "リンク必須",
+            FieldType.Boolean,
+            SystemRole.LinkRequired);
+        var newOnlyIds = new HashSet<FieldId>(
+        [
+            BuiltInFieldIds.ProductEmbeddingAllowed,
+            BuiltInFieldIds.CopyrightNoticeRetentionRequired,
+            BuiltInFieldIds.LicenseTextAttachmentRequired,
+            BuiltInFieldIds.SameLicenseRequired,
+            BuiltInFieldIds.AiTrainingAllowed,
+            BuiltInFieldIds.EngineRestrictionExists,
+        ]);
+        var legacyDefinitions = BuiltInFieldCatalog.All
+            .Where(definition => !newOnlyIds.Contains(definition.Id))
+            .Select(definition => definition.Id == legacyCredit.Id
+                ? legacyCredit
+                : definition.Id == legacyGenerativeAi.Id
+                    ? legacyGenerativeAi
+                    : definition)
+            .Append(legacyLink)
+            .ToArray();
+        await new FieldDefinitionRepository(fileStore).SaveAsync(layout, legacyDefinitions);
+        var now = DateTimeOffset.UtcNow;
+        var record = AssetRecord.Create(now)
+            .SetValue(legacyCredit, new BooleanFieldValue(true), now)
+            .SetValue(legacyGenerativeAi, new BooleanFieldValue(true), now)
+            .SetValue(legacyLink, new BooleanFieldValue(true), now);
+        await new RecordRepository(fileStore).SaveAsync(layout, new PersistedAssetRecord(record));
+
+        _ = await initializer.InitializeAsync();
+
+        var definitions = await new FieldDefinitionRepository(fileStore).LoadAsync(layout);
+        Assert.Equal(12, definitions.Count(definition =>
+            LicenseConditionCatalog.Find(definition.SystemRole) is not null));
+        Assert.DoesNotContain(definitions, definition => definition.Id == BuiltInFieldIds.LinkRequired);
+        var loaded = await new RecordRepository(fileStore).LoadAsync(
+            layout,
+            RecordRepository.GetRecordPath(layout, record.Id),
+            definitions);
+        Assert.True(loaded.Record.Record.GetValue<BooleanFieldValue>(
+            BuiltInFieldIds.CreditDisplayRequired)?.Value);
+        Assert.True(loaded.Record.Record.GetValue<BooleanFieldValue>(
+            BuiltInFieldIds.GenerativeAiInputAllowed)?.Value);
+        Assert.DoesNotContain(BuiltInFieldIds.LinkRequired, loaded.Record.Record.Values.Keys);
     }
 
     private sealed class CollectingProgress : IProgress<StartupProgress>

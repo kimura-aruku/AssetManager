@@ -233,17 +233,15 @@ public sealed class FieldEditorViewModel : ObservableObject
 
     public bool IsOtherMultiOption => IsMultiOption && !IsAssetTypeSet && !IsTagSet;
 
-    public bool IsLicenseCondition => Definition.SystemRole is
-        SystemRole.CreditRequired
-        or SystemRole.LinkRequired
-        or SystemRole.LogoRequired
-        or SystemRole.CommercialUseAllowed
-        or SystemRole.ModificationAllowed
-        or SystemRole.RedistributionAllowed
-        or SystemRole.AdultUseAllowed
-        or SystemRole.GenerativeAiUseAllowed
-        or SystemRole.LicenseUnknown
-        or SystemRole.LicenseNeedsReview;
+    public LicenseConditionDefinition? LicenseCondition => LicenseConditionCatalog.Find(Definition.SystemRole);
+
+    public bool IsLicenseCondition => LicenseCondition is not null;
+
+    public string? LicenseConditionSummary => LicenseCondition?.Summary;
+
+    public string? LicenseConditionDescription => LicenseCondition?.Description;
+
+    public string? LicenseConditionToolTip => LicenseCondition?.ToolTip;
 
     public bool IsStandaloneBoolean => IsBoolean && !IsLicenseCondition;
 
@@ -874,22 +872,11 @@ public sealed class RecordRowViewModel
 
     private static string CreateLicenseSummary(AssetRecord record)
     {
-        var labels = new List<string>();
-        AddFlag(BuiltInFieldIds.CommercialUseAllowed, "商用○");
-        AddFlag(BuiltInFieldIds.ModificationAllowed, "改変○");
-        AddFlag(BuiltInFieldIds.CreditRequired, "クレジット必須");
-        AddFlag(BuiltInFieldIds.LinkRequired, "リンク必須");
-        AddFlag(BuiltInFieldIds.LicenseUnknown, "条件不明");
-        AddFlag(BuiltInFieldIds.LicenseNeedsReview, "要再確認");
-        return labels.Count == 0 ? "—" : string.Join("  ", labels);
-
-        void AddFlag(FieldId id, string label)
-        {
-            if (record.GetValue<BooleanFieldValue>(id)?.Value == true)
-            {
-                labels.Add(label);
-            }
-        }
+        var labels = LicenseConditionCatalog.All
+            .Where(condition => record.GetValue<BooleanFieldValue>(condition.FieldId)?.Value == true)
+            .Select(condition => condition.Label)
+            .ToArray();
+        return labels.Length == 0 ? "—" : string.Join("  ", labels);
     }
 }
 

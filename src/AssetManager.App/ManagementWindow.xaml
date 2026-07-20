@@ -98,18 +98,21 @@
               <TextBox Margin="0,4,0,12"
                        Text="{Binding LicensePresetName, UpdateSourceTrigger=PropertyChanged}" />
               <TextBlock Margin="0,0,0,6" FontWeight="SemiBold" Text="ライセンス条件" />
-              <UniformGrid Margin="0,0,0,12" Columns="2">
-                <CheckBox Margin="0,3,8,3" Content="クレジット必須" IsChecked="{Binding PresetCreditRequired}" />
-                <CheckBox Margin="0,3,8,3" Content="リンク必須" IsChecked="{Binding PresetLinkRequired}" />
-                <CheckBox Margin="0,3,8,3" Content="ロゴ必須" IsChecked="{Binding PresetLogoRequired}" />
-                <CheckBox Margin="0,3,8,3" Content="商用利用可" IsChecked="{Binding PresetCommercialUseAllowed}" />
-                <CheckBox Margin="0,3,8,3" Content="改変可" IsChecked="{Binding PresetModificationAllowed}" />
-                <CheckBox Margin="0,3,8,3" Content="再配布可" IsChecked="{Binding PresetRedistributionAllowed}" />
-                <CheckBox Margin="0,3,8,3" Content="成人向け利用可" IsChecked="{Binding PresetAdultUseAllowed}" />
-                <CheckBox Margin="0,3,8,3" Content="生成AI利用可" IsChecked="{Binding PresetGenerativeAiUseAllowed}" />
-                <CheckBox Margin="0,3,8,3" Content="条件不明" IsChecked="{Binding PresetConditionsUnknown}" />
-                <CheckBox Margin="0,3,8,3" Content="要再確認" IsChecked="{Binding PresetNeedsReview}" />
-              </UniformGrid>
+              <ItemsControl Margin="0,0,0,12" ItemsSource="{Binding LicensePresetConditions}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <UniformGrid Columns="2" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <CheckBox Margin="0,3,8,3"
+                              Content="{Binding Label}"
+                              IsChecked="{Binding IsChecked}"
+                              ToolTip="{Binding ToolTip}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
               <StackPanel Orientation="Horizontal">
                 <Button Command="{Binding SaveLicensePresetCommand}" Content="保存" />
                 <Button Margin="6,0,0,0"

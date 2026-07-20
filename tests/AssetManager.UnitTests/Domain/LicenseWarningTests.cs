@@ -15,7 +15,7 @@ public sealed class LicenseWarningTests
     public void EvaluatesAllApplicableLicenseWarnings()
     {
         var review = new LicenseReviewInfo(
-            new LicenseTerms(ConditionsUnknown: true, NeedsReview: true),
+            new LicenseTerms(NeedsReview: true),
             AssetDate.ParseStorage("2025-07-18"),
             AssetDate.ParseStorage("2026-07-18"));
 
@@ -27,7 +27,6 @@ public sealed class LicenseWarningTests
             [
                 LicenseWarningKind.Expired,
                 LicenseWarningKind.ReviewOverdue,
-                LicenseWarningKind.ConditionsUnknown,
                 LicenseWarningKind.NeedsReview,
             ],
             warnings.Select(warning => warning.Kind));
@@ -51,10 +50,10 @@ public sealed class LicenseWarningTests
     [Fact]
     public void CreatesLicenseReviewFromRecordValues()
     {
-        var unknownDefinition = GetDefinition(BuiltInFieldIds.LicenseUnknown);
+        var reviewDefinition = GetDefinition(BuiltInFieldIds.LicenseReviewRequired);
         var checkedDefinition = GetDefinition(BuiltInFieldIds.LicenseLastCheckedDate);
         var record = AssetRecord.Create(Now)
-            .SetValue(unknownDefinition, new BooleanFieldValue(true), Now.AddMinutes(1))
+            .SetValue(reviewDefinition, new BooleanFieldValue(true), Now.AddMinutes(1))
             .SetValue(
                 checkedDefinition,
                 new DateFieldValue(AssetDate.ParseStorage("2026-07-19")),
@@ -62,7 +61,7 @@ public sealed class LicenseWarningTests
 
         var review = LicenseReviewInfo.FromRecord(record);
 
-        Assert.True(review.Terms.ConditionsUnknown);
+        Assert.True(review.Terms.NeedsReview);
         Assert.Equal("2026-07-19", review.LastCheckedDate?.ToStorageString());
     }
 

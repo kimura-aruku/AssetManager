@@ -56,7 +56,7 @@ public sealed class LicensePresetInputCoordinator : IDisposable
         {
             foreach (var editor in _conditionEditors)
             {
-                editor.BooleanValue = ReadTerm(preset.Terms, editor.Definition.SystemRole);
+                editor.BooleanValue = preset.Terms.GetValue(editor.Definition.SystemRole);
             }
         }
         finally
@@ -73,21 +73,4 @@ public sealed class LicensePresetInputCoordinator : IDisposable
         }
     }
 
-    private static bool ReadTerm(LicenseTerms terms, SystemRole? role)
-    {
-        return role switch
-        {
-            SystemRole.CreditRequired => terms.CreditRequired,
-            SystemRole.LinkRequired => terms.LinkRequired,
-            SystemRole.LogoRequired => terms.LogoRequired,
-            SystemRole.CommercialUseAllowed => terms.CommercialUseAllowed,
-            SystemRole.ModificationAllowed => terms.ModificationAllowed,
-            SystemRole.RedistributionAllowed => terms.RedistributionAllowed,
-            SystemRole.AdultUseAllowed => terms.AdultUseAllowed,
-            SystemRole.GenerativeAiUseAllowed => terms.GenerativeAiUseAllowed,
-            SystemRole.LicenseUnknown => terms.ConditionsUnknown,
-            SystemRole.LicenseNeedsReview => terms.NeedsReview,
-            _ => throw new ArgumentException("ライセンス条件以外のエディターが含まれています。", nameof(role)),
-        };
-    }
 }

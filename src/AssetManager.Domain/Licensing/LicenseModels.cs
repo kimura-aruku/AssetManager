@@ -7,15 +7,17 @@ using AssetManager.Domain.Values;
 namespace AssetManager.Domain.Licensing;
 
 public sealed record LicenseTerms(
-    bool CreditRequired = false,
-    bool LinkRequired = false,
-    bool LogoRequired = false,
     bool CommercialUseAllowed = false,
     bool ModificationAllowed = false,
-    bool RedistributionAllowed = false,
-    bool AdultUseAllowed = false,
-    bool GenerativeAiUseAllowed = false,
-    bool ConditionsUnknown = false,
+    bool ProductEmbeddingAllowed = false,
+    bool OriginalDataRedistributionAllowed = false,
+    bool CreditDisplayRequired = false,
+    bool CopyrightNoticeRetentionRequired = false,
+    bool LicenseTextAttachmentRequired = false,
+    bool SameLicenseRequired = false,
+    bool AiTrainingAllowed = false,
+    bool GenerativeAiInputAllowed = false,
+    bool EngineRestrictionExists = false,
     bool NeedsReview = false)
 {
     public static LicenseTerms FromRecord(AssetRecord record)
@@ -23,16 +25,38 @@ public sealed record LicenseTerms(
         ArgumentNullException.ThrowIfNull(record);
 
         return new LicenseTerms(
-            CreditRequired: ReadBoolean(record, BuiltInFieldIds.CreditRequired),
-            LinkRequired: ReadBoolean(record, BuiltInFieldIds.LinkRequired),
-            LogoRequired: ReadBoolean(record, BuiltInFieldIds.LogoRequired),
             CommercialUseAllowed: ReadBoolean(record, BuiltInFieldIds.CommercialUseAllowed),
             ModificationAllowed: ReadBoolean(record, BuiltInFieldIds.ModificationAllowed),
-            RedistributionAllowed: ReadBoolean(record, BuiltInFieldIds.RedistributionAllowed),
-            AdultUseAllowed: ReadBoolean(record, BuiltInFieldIds.AdultUseAllowed),
-            GenerativeAiUseAllowed: ReadBoolean(record, BuiltInFieldIds.GenerativeAiUseAllowed),
-            ConditionsUnknown: ReadBoolean(record, BuiltInFieldIds.LicenseUnknown),
-            NeedsReview: ReadBoolean(record, BuiltInFieldIds.LicenseNeedsReview));
+            ProductEmbeddingAllowed: ReadBoolean(record, BuiltInFieldIds.ProductEmbeddingAllowed),
+            OriginalDataRedistributionAllowed: ReadBoolean(record, BuiltInFieldIds.OriginalDataRedistributionAllowed),
+            CreditDisplayRequired: ReadBoolean(record, BuiltInFieldIds.CreditDisplayRequired),
+            CopyrightNoticeRetentionRequired: ReadBoolean(record, BuiltInFieldIds.CopyrightNoticeRetentionRequired),
+            LicenseTextAttachmentRequired: ReadBoolean(record, BuiltInFieldIds.LicenseTextAttachmentRequired),
+            SameLicenseRequired: ReadBoolean(record, BuiltInFieldIds.SameLicenseRequired),
+            AiTrainingAllowed: ReadBoolean(record, BuiltInFieldIds.AiTrainingAllowed),
+            GenerativeAiInputAllowed: ReadBoolean(record, BuiltInFieldIds.GenerativeAiInputAllowed),
+            EngineRestrictionExists: ReadBoolean(record, BuiltInFieldIds.EngineRestrictionExists),
+            NeedsReview: ReadBoolean(record, BuiltInFieldIds.LicenseReviewRequired));
+    }
+
+    public bool GetValue(SystemRole? role)
+    {
+        return role switch
+        {
+            SystemRole.CommercialUseAllowed => CommercialUseAllowed,
+            SystemRole.ModificationAllowed => ModificationAllowed,
+            SystemRole.ProductEmbeddingAllowed => ProductEmbeddingAllowed,
+            SystemRole.OriginalDataRedistributionAllowed => OriginalDataRedistributionAllowed,
+            SystemRole.CreditDisplayRequired => CreditDisplayRequired,
+            SystemRole.CopyrightNoticeRetentionRequired => CopyrightNoticeRetentionRequired,
+            SystemRole.LicenseTextAttachmentRequired => LicenseTextAttachmentRequired,
+            SystemRole.SameLicenseRequired => SameLicenseRequired,
+            SystemRole.AiTrainingAllowed => AiTrainingAllowed,
+            SystemRole.GenerativeAiInputAllowed => GenerativeAiInputAllowed,
+            SystemRole.EngineRestrictionExists => EngineRestrictionExists,
+            SystemRole.LicenseReviewRequired => NeedsReview,
+            _ => throw new ArgumentException("ライセンス条件のシステム役割を指定してください。", nameof(role)),
+        };
     }
 
     private static bool ReadBoolean(AssetRecord record, FieldId fieldId)
@@ -78,7 +102,6 @@ public enum LicenseWarningKind
 {
     Expired,
     ReviewOverdue,
-    ConditionsUnknown,
     NeedsReview,
 }
 
@@ -119,14 +142,6 @@ public static class LicenseWarningEvaluator
                 LicenseWarningKind.ReviewOverdue,
                 LicenseWarningSeverity.Warning,
                 $"ライセンスの最終確認から{policy.ReviewWarningDays}日を超えています。"));
-        }
-
-        if (review.Terms.ConditionsUnknown)
-        {
-            warnings.Add(new LicenseWarning(
-                LicenseWarningKind.ConditionsUnknown,
-                LicenseWarningSeverity.Warning,
-                "ライセンス条件が不明です。"));
         }
 
         if (review.Terms.NeedsReview)

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using AssetManager.Domain.Licensing;
 
 namespace AssetManager.Domain.Fields;
 
@@ -30,16 +31,11 @@ public static class BuiltInFieldCatalog
             BuiltIn(BuiltInFieldIds.ReceiptPath, "領収書パス", FieldType.FilePath, SystemRole.ReceiptPath),
             BuiltIn(BuiltInFieldIds.PurchaseAccount, "購入アカウント名", FieldType.Text, SystemRole.PurchaseAccount),
             BuiltIn(BuiltInFieldIds.LicensePreset, "定型ライセンス", FieldType.SingleSelect, SystemRole.LicensePreset),
-            BuiltIn(BuiltInFieldIds.CreditRequired, "クレジット必須", FieldType.Boolean, SystemRole.CreditRequired),
-            BuiltIn(BuiltInFieldIds.LinkRequired, "リンク必須", FieldType.Boolean, SystemRole.LinkRequired),
-            BuiltIn(BuiltInFieldIds.LogoRequired, "ロゴ必須", FieldType.Boolean, SystemRole.LogoRequired),
-            BuiltIn(BuiltInFieldIds.CommercialUseAllowed, "商用利用可", FieldType.Boolean, SystemRole.CommercialUseAllowed),
-            BuiltIn(BuiltInFieldIds.ModificationAllowed, "改変可", FieldType.Boolean, SystemRole.ModificationAllowed),
-            BuiltIn(BuiltInFieldIds.RedistributionAllowed, "再配布可", FieldType.Boolean, SystemRole.RedistributionAllowed),
-            BuiltIn(BuiltInFieldIds.AdultUseAllowed, "成人向け利用可", FieldType.Boolean, SystemRole.AdultUseAllowed),
-            BuiltIn(BuiltInFieldIds.GenerativeAiUseAllowed, "生成AI利用可", FieldType.Boolean, SystemRole.GenerativeAiUseAllowed),
-            BuiltIn(BuiltInFieldIds.LicenseUnknown, "条件不明", FieldType.Boolean, SystemRole.LicenseUnknown),
-            BuiltIn(BuiltInFieldIds.LicenseNeedsReview, "要再確認", FieldType.Boolean, SystemRole.LicenseNeedsReview),
+            ..LicenseConditionCatalog.All.Select(condition => BuiltIn(
+                condition.FieldId,
+                condition.Label,
+                FieldType.Boolean,
+                condition.SystemRole)),
             BuiltIn(BuiltInFieldIds.CreditText, "クレジット内容", FieldType.MultilineText, SystemRole.CreditText),
             BuiltIn(BuiltInFieldIds.LicenseNotes, "ライセンス備考", FieldType.MultilineText, SystemRole.LicenseNotes),
             BuiltIn(BuiltInFieldIds.LicenseFilePath, "ライセンスファイルパス", FieldType.FilePath, SystemRole.LicenseFilePath),

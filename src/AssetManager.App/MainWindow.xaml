@@ -410,7 +410,8 @@
                           <DataTemplate>
                             <CheckBox Margin="0,2,8,2"
                                       Content="{Binding Label}"
-                                      IsChecked="{Binding BooleanValue}" />
+                                      IsChecked="{Binding BooleanValue}"
+                                      ToolTip="{Binding LicenseConditionToolTip}" />
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
