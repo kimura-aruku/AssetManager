@@ -12,6 +12,7 @@
 | 一括編集・矩形コピー／貼り付け | `GridSelectionNormalizerTests`、`GridBatchEditPlannerTests`、`GridClipboardServiceTests` | 済 |
 | アンドゥ／リドゥ | `UndoRedoServiceTests`、`FileUndoHistoryTests` | 済 |
 | ライセンス警告・状態アイコン | `LicenseWarningTests`、`RecordIndicatorEvaluatorTests` | 済 |
+| 12項目のライセンス条件・旧データ移行・定型ライセンスの保存と適用 | `RecordIndicatorEvaluatorTests`、`DataSetInitializerTests`、`FieldEditorViewModelTests`、`CoreRepositoryTests` | 済 |
 | 設定保存・データルート変更 | `JsonAppSettingsStoreTests`、`DataRootMigrationServiceTests` | 済 |
 | 不正JSON・型不一致・リンク切れ・権限不足 | `DataSetInitializerTests`、`DomainModelValidatorTests`、`PathCheckServiceTests` | 済 |
 | 複数ファイル更新のロールバック | `TransactionAndMigrationTests`、`AtomicJsonFileStoreTests` | 済 |
@@ -27,12 +28,16 @@
 3. 日付をカレンダーから選択でき、日本円入力では数値以外が拒否され「円」が表示される
 4. 種類・タグ・状態・お気に入りと各カラム条件で検索できる
 5. 非連続行と連続カラム範囲を選択し、コピー・貼り付け・一括編集・アンドゥが期待どおり動作する
-6. ライセンス条件と状態アイコンのツールチップに名称・理由が表示される
-7. カラム・種類・タグ・タグ分類の管理画面で追加・編集・削除できる
+6. 12個のライセンス条件が指定順で表示され、詳細ペイン、定型ライセンス管理、一覧アイコンのツールチップに説明だけが表示される
+7. カラム・種類・タグ・タグ分類・定型ライセンスの管理画面で追加・編集・削除できる
 8. 設定画面で起動時パス確認と警告日数を保存できる
 9. 空の一時フォルダーへのデータ保存先変更を行い、再起動後に新しい保存先が使われる
 10. ボタン、右クリックメニュー、`Ctrl+N`、`Ctrl+S`、`Ctrl+C`、`Ctrl+V`、`Ctrl+Z`、`Ctrl+Y`、`Delete`、`F5`を確認する
 11. 管理レコードを削除しても、登録した素材の実ファイルが残る
+12. 定型ライセンスを選択すると全ライセンス条件が反映され、条件を手動変更すると定型選択が解除される
+13. 詳細ペインの選択入力上でホイール操作しても選択値が変わらず、詳細ペイン全体がスクロールする
+14. 詳細ペインを下へスクロールしてから「新規」を押すと、一番上へ戻る
+15. 新規レコードへ存在するパスを設定して保存すると、再起動を待たず中央一覧の状態が「パス確認済み」になる
 
 ## 公開前監査
 

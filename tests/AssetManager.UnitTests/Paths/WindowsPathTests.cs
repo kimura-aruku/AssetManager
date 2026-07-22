@@ -96,11 +96,56 @@ public sealed class WindowsPathTests
         Assert.Null(service.PickTargetFile());
     }
 
+    [Fact]
+    public void UnifiedTargetPickerAcceptsFileOrFolder()
+    {
+        var fileSystem = new FakeFileSystem
+        {
+            ExistingKinds =
+            {
+                [@"C:\Assets\file.png"] = PathEntryKind.File,
+                [@"C:\Assets\Folder"] = PathEntryKind.Folder,
+            },
+        };
+        var picker = new FakePicker { FileOrFolderResult = @"C:\Assets\file.png" };
+        var service = new PathRegistrationService(fileSystem, picker);
+
+        var file = service.PickTarget();
+        picker.FileOrFolderResult = @"C:\Assets\Folder";
+        var folder = service.PickTarget();
+
+        Assert.Equal(TargetPathKind.File, file!.Kind);
+        Assert.Equal(@"C:\Assets\file.png", file.Path);
+        Assert.Equal(TargetPathKind.Folder, folder!.Kind);
+        Assert.Equal(@"C:\Assets\Folder", folder.Path);
+    }
+
+    [Fact]
+    public void AuxiliaryPickerReturnsNormalizedSelectedPath()
+    {
+        var fileSystem = new FakeFileSystem
+        {
+            ExistingKinds = { [@"C:\Assets\receipt.pdf"] = PathEntryKind.File },
+        };
+        var picker = new FakePicker { FileResult = @"c:/Assets/receipt.pdf" };
+        var service = new PathRegistrationService(fileSystem, picker);
+
+        var result = service.PickAuxiliaryFile("領収書を選択");
+
+        Assert.NotNull(result);
+        Assert.Equal(@"C:\Assets\receipt.pdf", result.Path);
+        Assert.Equal(PathEntryKind.File, result.ExpectedKind);
+    }
+
     private sealed class FakePicker : IWindowsPathPicker
     {
+        public string? FileOrFolderResult { get; set; }
+
         public string? FileResult { get; set; }
 
         public string? FolderResult { get; set; }
+
+        public string? PickFileOrFolder(string title) => FileOrFolderResult;
 
         public string? PickFile(string title) => FileResult;
 

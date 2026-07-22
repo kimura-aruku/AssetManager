@@ -68,6 +68,8 @@ public interface IWindowsPathFileSystem
 
 public interface IWindowsPathPicker
 {
+    string? PickFileOrFolder(string title);
+
     string? PickFile(string title);
 
     string? PickFolder(string title);
@@ -76,6 +78,8 @@ public interface IWindowsPathPicker
 public interface IWindowsShellService
 {
     void Open(string path);
+
+    void OpenWebUrl(string url);
 
     void ShowInExplorer(string path, PathEntryKind kind);
 }

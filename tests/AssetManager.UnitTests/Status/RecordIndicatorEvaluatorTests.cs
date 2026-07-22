@@ -16,23 +16,30 @@ public sealed class RecordIndicatorEvaluatorTests
     public void LicenseBadgeEvaluatorは必須項目と許可項目を固定順で返す()
     {
         var badges = LicenseBadgeEvaluator.Evaluate(new LicenseTerms(
-            CreditRequired: true,
-            LinkRequired: true,
             CommercialUseAllowed: true,
             ModificationAllowed: true,
-            GenerativeAiUseAllowed: true));
+            ProductEmbeddingAllowed: true,
+            CreditDisplayRequired: true,
+            GenerativeAiInputAllowed: true));
 
         Assert.Equal(
             [
-                LicenseBadgeKind.CreditRequired,
-                LicenseBadgeKind.LinkRequired,
                 LicenseBadgeKind.CommercialUseAllowed,
                 LicenseBadgeKind.ModificationAllowed,
-                LicenseBadgeKind.GenerativeAiUseAllowed,
+                LicenseBadgeKind.ProductEmbeddingAllowed,
+                LicenseBadgeKind.CreditDisplayRequired,
+                LicenseBadgeKind.GenerativeAiInputAllowed,
             ],
             badges.Select(badge => badge.Kind));
-        Assert.All(badges.Take(2), badge => Assert.True(badge.IsRequired));
-        Assert.All(badges.Skip(2), badge => Assert.False(badge.IsRequired));
+        Assert.False(badges[0].IsRequired);
+        Assert.False(badges[1].IsRequired);
+        Assert.False(badges[2].IsRequired);
+        Assert.True(badges[3].IsRequired);
+        Assert.False(badges[4].IsRequired);
+        Assert.Equal(
+            "クレジット画面など、利用者が確認できる場所への作者名等の表示が必要です。",
+            badges[3].ToolTip);
+        Assert.DoesNotContain("利用者向けの作者表示が必要", badges[3].ToolTip, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -40,8 +47,8 @@ public sealed class RecordIndicatorEvaluatorTests
     {
         var record = SetValue(
             SetValue(
-                SetValue(AssetRecord.Create(Now), BuiltInFieldIds.LicenseUnknown, new BooleanFieldValue(true)),
-                BuiltInFieldIds.LicenseNeedsReview,
+                AssetRecord.Create(Now),
+                BuiltInFieldIds.LicenseReviewRequired,
                 new BooleanFieldValue(true)),
             BuiltInFieldIds.LicenseExpiryDate,
             new DateFieldValue(AssetDate.ParseDisplay("2026/07/18")));
@@ -56,7 +63,6 @@ public sealed class RecordIndicatorEvaluatorTests
             [
                 RecordIndicatorKind.LicenseExpired,
                 RecordIndicatorKind.TargetPathMissing,
-                RecordIndicatorKind.LicenseConditionsUnknown,
                 RecordIndicatorKind.LicenseNeedsReview,
             ],
             indicators.Select(indicator => indicator.Kind));
@@ -116,6 +122,29 @@ public sealed class RecordIndicatorEvaluatorTests
 
         Assert.Equal(RecordIndicatorKind.PathsAvailable, indicator.Kind);
         Assert.Equal(RecordIndicatorSeverity.Success, indicator.Severity);
+    }
+
+    [Fact]
+    public void ライセンス条件定義は指定された12項目と説明を保持する()
+    {
+        Assert.Equal(12, LicenseConditionCatalog.All.Count);
+        Assert.Equal(
+            [
+                ("商用利用可", "商用利用できる", "営利目的の製品・サービスで利用できます。"),
+                ("改変可", "内容を変更できる", "元データやソースコードを編集・加工できます。"),
+                ("製品組込み可", "製品に組み込める", "ゲームやアプリなどの製品に組み込んで利用・配布できます。"),
+                ("元データ再配布可", "元データを再配布できる", "元データを単体または取り出せる形で第三者に配布できます。"),
+                ("クレジット表示必須", "利用者向けの作者表示が必要", "クレジット画面など、利用者が確認できる場所への作者名等の表示が必要です。"),
+                ("著作権表示保持必須", "Copyright表記を残す必要がある", "元データに含まれる著作権表示を削除せず保持する必要があります。"),
+                ("ライセンス文添付必須", "ライセンス本文の添付が必要", "配布物にライセンス本文または指定された許諾表示を含める必要があります。"),
+                ("同一ライセンス継承必須", "派生物にも同じライセンスを適用する必要がある", "改変物や派生物を配布する場合、同一または指定されたライセンスの適用が必要です。"),
+                ("AI学習利用可", "AIモデルの学習に利用できる", "AI・機械学習モデルの学習データとして利用できます。"),
+                ("生成AI入力可", "生成AIへ入力できる", "生成AIのプロンプト、参照画像、入力データなどとして利用できます。"),
+                ("エンジン制限あり", "特定のエンジンでのみ利用できる", "Unity限定など、利用できるゲームエンジンや環境に制限があります。"),
+                ("再確認必要", "利用前の再確認が必要", "規約変更、個別条件、用途制限などを利用前に再確認する必要があります。"),
+            ],
+            LicenseConditionCatalog.All.Select(condition =>
+                (condition.Label, condition.Summary, condition.Description)));
     }
 
     private static AssetRecord SetValue(AssetRecord record, FieldId id, FieldValue value)

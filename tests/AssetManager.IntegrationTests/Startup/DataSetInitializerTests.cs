@@ -7,6 +7,9 @@ using AssetManager.Infrastructure.Persistence.Repositories;
 using AssetManager.Infrastructure.Startup;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
+using AssetManager.Domain.Licensing;
+using AssetManager.Domain.Records;
+using AssetManager.Domain.Values;
 using System.Text.Json;
 
 namespace AssetManager.IntegrationTests.Startup;
@@ -33,6 +36,7 @@ public sealed class DataSetInitializerTests
         Assert.True(File.Exists(layout.ManifestFile));
         Assert.True(File.Exists(layout.FieldsFile));
         Assert.True(File.Exists(layout.AssetTypesFile));
+        Assert.True(File.Exists(layout.LicensePresetsFile));
         Assert.True(File.Exists(layout.TagsFile));
         Assert.True(File.Exists(layout.SettingsFile));
         Assert.True(File.Exists(layout.ViewsFile));
@@ -41,8 +45,10 @@ public sealed class DataSetInitializerTests
         Assert.Equal(7, progress.Values[^1].CompletedSteps);
 
         var types = await new AssetTypeRepository(new AtomicJsonFileStore()).LoadAsync(layout);
+        var licensePresets = await new LicensePresetRepository(new AtomicJsonFileStore()).LoadAsync(layout);
         var tags = await new TagRepository(new AtomicJsonFileStore()).LoadAsync(layout);
         Assert.Equal(8, types.Count);
+        Assert.Empty(licensePresets);
         Assert.Empty(tags.Categories);
         Assert.Empty(tags.Tags);
     }
@@ -103,6 +109,193 @@ public sealed class DataSetInitializerTests
         var excluded = Assert.Single(result.ExcludedRecords);
         Assert.Equal(excludedPath, excluded.Path);
         Assert.NotEmpty(excluded.Error);
+    }
+
+    [Fact]
+    public async Task RestartMigratesFreeTextAcquisitionSourcesToSelectionMaster()
+    {
+        using var temporary = new TemporaryDirectory();
+        var paths = new AppDataPaths(temporary.Path);
+        var initializer = new DataSetInitializer(paths);
+        var firstResult = await initializer.InitializeAsync();
+        var layout = new DataRootLayout(firstResult.DataRoot);
+        var fileStore = new AtomicJsonFileStore();
+        var current = BuiltInFieldCatalog.All.Single(
+            definition => definition.Id == BuiltInFieldIds.AcquisitionSource);
+        var legacy = FieldDefinition.CreateBuiltIn(
+            current.Id,
+            current.Label,
+            FieldType.Text,
+            current.SystemRole!.Value,
+            current.MainTableVisible,
+            current.MainTableRequired,
+            current.DetailVisible,
+            current.UserCanHide);
+        var legacyDefinitions = BuiltInFieldCatalog.All.Select(definition =>
+            definition.Id == legacy.Id ? legacy : definition).ToArray();
+        await new FieldDefinitionRepository(fileStore).SaveAsync(layout, legacyDefinitions);
+        var now = DateTimeOffset.UtcNow;
+        var record = AssetRecord.Create(now).SetValue(
+            legacy,
+            new TextFieldValue("BOOTH"),
+            now);
+        await new RecordRepository(fileStore).SaveAsync(layout, new PersistedAssetRecord(record));
+
+        _ = await initializer.InitializeAsync();
+
+        var definitions = await new FieldDefinitionRepository(fileStore).LoadAsync(layout);
+        var migratedDefinition = definitions.Single(
+            definition => definition.Id == BuiltInFieldIds.AcquisitionSource);
+        var source = Assert.Single(migratedDefinition.Options);
+        Assert.Equal(FieldType.SingleSelect, migratedDefinition.Type);
+        Assert.Equal("BOOTH", source.Label);
+        var loaded = await new RecordRepository(fileStore).LoadAsync(
+            layout,
+            RecordRepository.GetRecordPath(layout, record.Id),
+            definitions);
+        Assert.Equal(
+            source.Id,
+            loaded.Record.Record.GetValue<SingleSelectionFieldValue>(BuiltInFieldIds.AcquisitionSource)?.Value);
+    }
+
+    [Fact]
+    public async Task RestartMigratesOverviewDetailAndLegacyNotesWithoutLosingText()
+    {
+        using var temporary = new TemporaryDirectory();
+        var paths = new AppDataPaths(temporary.Path);
+        var initializer = new DataSetInitializer(paths);
+        var firstResult = await initializer.InitializeAsync();
+        var layout = new DataRootLayout(firstResult.DataRoot);
+        var fileStore = new AtomicJsonFileStore();
+        var currentDetail = BuiltInFieldCatalog.All.Single(
+            definition => definition.Id == BuiltInFieldIds.Description);
+        var legacyDetail = FieldDefinition.CreateBuiltIn(
+            currentDetail.Id,
+            "説明",
+            FieldType.MultilineText,
+            SystemRole.Description);
+        var legacyNotes = FieldDefinition.CreateBuiltIn(
+            BuiltInFieldIds.Notes,
+            "備考",
+            FieldType.MultilineText,
+            SystemRole.Notes);
+        var legacyDefinitions = new List<FieldDefinition>();
+        foreach (var definition in BuiltInFieldCatalog.All)
+        {
+            if (definition.Id == BuiltInFieldIds.Overview
+                || definition.Id == BuiltInFieldIds.LicensePreset)
+            {
+                continue;
+            }
+
+            if (definition.Id == BuiltInFieldIds.Description)
+            {
+                legacyDefinitions.Add(legacyDetail);
+                legacyDefinitions.Add(legacyNotes);
+            }
+            else
+            {
+                legacyDefinitions.Add(definition);
+            }
+        }
+
+        await new FieldDefinitionRepository(fileStore).SaveAsync(layout, legacyDefinitions);
+        var now = DateTimeOffset.UtcNow;
+        var record = AssetRecord.Create(now)
+            .SetValue(legacyDetail, new MultilineTextFieldValue("既存の説明"), now)
+            .SetValue(legacyNotes, new MultilineTextFieldValue("既存の備考"), now);
+        await new RecordRepository(fileStore).SaveAsync(layout, new PersistedAssetRecord(record));
+
+        _ = await initializer.InitializeAsync();
+
+        var definitions = await new FieldDefinitionRepository(fileStore).LoadAsync(layout);
+        var overviewIndex = Array.FindIndex(
+            definitions.ToArray(),
+            definition => definition.Id == BuiltInFieldIds.Overview);
+        var detailIndex = Array.FindIndex(
+            definitions.ToArray(),
+            definition => definition.Id == BuiltInFieldIds.Description);
+        Assert.True(overviewIndex >= 0 && overviewIndex < detailIndex);
+        Assert.Equal("概要", definitions[overviewIndex].Label);
+        Assert.Equal("詳細", definitions[detailIndex].Label);
+        Assert.DoesNotContain(definitions, definition => definition.Id == BuiltInFieldIds.Notes);
+        Assert.Contains(definitions, definition => definition.Id == BuiltInFieldIds.LicensePreset);
+
+        var loaded = await new RecordRepository(fileStore).LoadAsync(
+            layout,
+            RecordRepository.GetRecordPath(layout, record.Id),
+            definitions);
+        Assert.Equal(
+            $"既存の説明{Environment.NewLine}{Environment.NewLine}既存の備考",
+            loaded.Record.Record.GetValue<MultilineTextFieldValue>(BuiltInFieldIds.Description)?.Value);
+        Assert.False(loaded.Record.Record.Values.ContainsKey(BuiltInFieldIds.Notes));
+    }
+
+    [Fact]
+    public async Task RestartMigratesLegacyLicenseConditionsToTwelveConditions()
+    {
+        using var temporary = new TemporaryDirectory();
+        var paths = new AppDataPaths(temporary.Path);
+        var initializer = new DataSetInitializer(paths);
+        var firstResult = await initializer.InitializeAsync();
+        var layout = new DataRootLayout(firstResult.DataRoot);
+        var fileStore = new AtomicJsonFileStore();
+        var legacyCredit = FieldDefinition.CreateBuiltIn(
+            BuiltInFieldIds.CreditDisplayRequired,
+            "クレジット必須",
+            FieldType.Boolean,
+            SystemRole.CreditRequired);
+        var legacyGenerativeAi = FieldDefinition.CreateBuiltIn(
+            BuiltInFieldIds.GenerativeAiInputAllowed,
+            "生成AI利用可",
+            FieldType.Boolean,
+            SystemRole.GenerativeAiUseAllowed);
+        var legacyLink = FieldDefinition.CreateBuiltIn(
+            BuiltInFieldIds.LinkRequired,
+            "リンク必須",
+            FieldType.Boolean,
+            SystemRole.LinkRequired);
+        var newOnlyIds = new HashSet<FieldId>(
+        [
+            BuiltInFieldIds.ProductEmbeddingAllowed,
+            BuiltInFieldIds.CopyrightNoticeRetentionRequired,
+            BuiltInFieldIds.LicenseTextAttachmentRequired,
+            BuiltInFieldIds.SameLicenseRequired,
+            BuiltInFieldIds.AiTrainingAllowed,
+            BuiltInFieldIds.EngineRestrictionExists,
+        ]);
+        var legacyDefinitions = BuiltInFieldCatalog.All
+            .Where(definition => !newOnlyIds.Contains(definition.Id))
+            .Select(definition => definition.Id == legacyCredit.Id
+                ? legacyCredit
+                : definition.Id == legacyGenerativeAi.Id
+                    ? legacyGenerativeAi
+                    : definition)
+            .Append(legacyLink)
+            .ToArray();
+        await new FieldDefinitionRepository(fileStore).SaveAsync(layout, legacyDefinitions);
+        var now = DateTimeOffset.UtcNow;
+        var record = AssetRecord.Create(now)
+            .SetValue(legacyCredit, new BooleanFieldValue(true), now)
+            .SetValue(legacyGenerativeAi, new BooleanFieldValue(true), now)
+            .SetValue(legacyLink, new BooleanFieldValue(true), now);
+        await new RecordRepository(fileStore).SaveAsync(layout, new PersistedAssetRecord(record));
+
+        _ = await initializer.InitializeAsync();
+
+        var definitions = await new FieldDefinitionRepository(fileStore).LoadAsync(layout);
+        Assert.Equal(12, definitions.Count(definition =>
+            LicenseConditionCatalog.Find(definition.SystemRole) is not null));
+        Assert.DoesNotContain(definitions, definition => definition.Id == BuiltInFieldIds.LinkRequired);
+        var loaded = await new RecordRepository(fileStore).LoadAsync(
+            layout,
+            RecordRepository.GetRecordPath(layout, record.Id),
+            definitions);
+        Assert.True(loaded.Record.Record.GetValue<BooleanFieldValue>(
+            BuiltInFieldIds.CreditDisplayRequired)?.Value);
+        Assert.True(loaded.Record.Record.GetValue<BooleanFieldValue>(
+            BuiltInFieldIds.GenerativeAiInputAllowed)?.Value);
+        Assert.DoesNotContain(BuiltInFieldIds.LinkRequired, loaded.Record.Record.Values.Keys);
     }
 
     private sealed class CollectingProgress : IProgress<StartupProgress>

@@ -27,6 +27,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly Dictionary<AssetTypeId, string> _typeNames = [];
     private readonly Dictionary<TagId, string> _tagNames = [];
     private readonly List<AssetTypeDefinition> _assetTypes = [];
+    private readonly List<LicensePresetDefinition> _licensePresets = [];
+    private LicensePresetInputCoordinator? _licensePresetCoordinator;
     private RecordSearchSession? _searchSession;
     private RecordRowViewModel? _selectedRecord;
     private SavedSearch? _selectedSavedSearch;
@@ -71,10 +73,22 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         PasteSelectionCommand = new AsyncRelayCommand(
             PasteSelectionAsync,
             () => _selectedGridRows.Count > 0 && _selectedGridFields.Count > 0);
-        PickTargetFileCommand = new RelayCommand(() => PickTarget(isFolder: false));
-        PickTargetFolderCommand = new RelayCommand(() => PickTarget(isFolder: true));
+        PickTargetCommand = new RelayCommand(PickTarget);
+        PickFieldPathCommand = new RelayCommand<FieldEditorViewModel>(
+            PickFieldPath,
+            editor => editor.IsAuxiliaryPath);
+        PickListPathCommand = new RelayCommand<FieldEditorEntryViewModel>(PickListPath);
+        OpenFieldUrlCommand = new RelayCommand<FieldEditorViewModel>(
+            OpenFieldUrl,
+            editor => editor.IsUrl && !string.IsNullOrWhiteSpace(editor.Text));
+        OpenListUrlCommand = new RelayCommand<FieldEditorEntryViewModel>(
+            OpenListUrl,
+            entry => !string.IsNullOrWhiteSpace(entry.SecondaryText));
         OpenTargetCommand = new RelayCommand(OpenTarget, HasSelectedTarget);
         ShowTargetInExplorerCommand = new RelayCommand(ShowTargetInExplorer, HasSelectedTarget);
+        ShowRowTargetInExplorerCommand = new RelayCommand<RecordRowViewModel>(
+            ShowTargetInExplorer,
+            row => row.Record.TargetPath is not null);
         ShowManagementCommand = new AsyncRelayCommand(ShowManagementAsync);
         ShowSettingsCommand = new RelayCommand(_runtime.ShowSettingsWindow);
         SaveSearchCommand = new AsyncRelayCommand(SaveSearchAsync, () => !string.IsNullOrWhiteSpace(SavedSearchName));
@@ -88,6 +102,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public event EventHandler? GridColumnsChanged;
 
+    public event EventHandler? DetailScrollToTopRequested;
+
     public string DataRoot { get; }
 
     public string StartupSummary { get; }
@@ -97,6 +113,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     public ObservableCollection<SearchFieldViewModel> SearchFields { get; } = [];
 
     public ObservableCollection<FieldEditorViewModel> DetailFields { get; } = [];
+
+    public ObservableCollection<FieldEditorViewModel> LicenseConditionFields { get; } = [];
 
     public ObservableCollection<DisplayColumnOptionViewModel> DisplayColumns { get; } = [];
 
@@ -186,13 +204,21 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public ICommand PasteSelectionCommand { get; }
 
-    public ICommand PickTargetFileCommand { get; }
+    public ICommand PickTargetCommand { get; }
 
-    public ICommand PickTargetFolderCommand { get; }
+    public ICommand PickFieldPathCommand { get; }
+
+    public ICommand PickListPathCommand { get; }
+
+    public ICommand OpenFieldUrlCommand { get; }
+
+    public ICommand OpenListUrlCommand { get; }
 
     public ICommand OpenTargetCommand { get; }
 
     public ICommand ShowTargetInExplorerCommand { get; }
+
+    public ICommand ShowRowTargetInExplorerCommand { get; }
 
     public ICommand ShowManagementCommand { get; }
 
@@ -240,6 +266,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _licensePresetCoordinator?.Dispose();
+        _licensePresetCoordinator = null;
         _pathCheckCancellation?.Cancel();
         _pathCheckCancellation?.Dispose();
         _pathCheckCancellation = null;
@@ -266,7 +294,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _allRecords.Clear();
         _allRecords.AddRange(snapshot.Records);
         _definitions.Clear();
-        foreach (var definition in snapshot.FieldDefinitions)
+        foreach (var definition in snapshot.FieldDefinitions
+                     .OrderBy(definition => definition.Id == BuiltInFieldIds.Favorite ? 0 : 1))
         {
             _definitions[definition.Id] = definition;
         }
@@ -278,6 +307,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             _typeNames[type.Id] = type.Name;
             _assetTypes.Add(type);
         }
+
+        _licensePresets.Clear();
+        _licensePresets.AddRange(snapshot.LicensePresets);
 
         _tagNames.Clear();
         foreach (var tag in snapshot.Tags)
@@ -306,7 +338,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         var settings = await _runtime.SearchConfiguration.LoadViewColumnsAsync(cancellationToken);
         var settingMap = settings.ToDictionary(setting => setting.Id, StringComparer.Ordinal);
         DisplayColumns.Clear();
-        foreach (var definition in snapshot.FieldDefinitions.Where(definition => !definition.MainTableRequired))
+        foreach (var definition in snapshot.FieldDefinitions.Where(definition =>
+                     !definition.MainTableRequired
+                     && definition.Id != BuiltInFieldIds.Favorite
+                     && definition.Id != BuiltInFieldIds.LicenseLastCheckedDate))
         {
             var visible = settingMap.TryGetValue(definition.Id.Value, out var setting)
                 ? setting.Visible
@@ -415,11 +450,15 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsEditorVisible));
         StatusMessage = "新しい素材の情報を入力してください。";
         RelayCommand.RefreshCanExecute();
+        DetailScrollToTopRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void LoadEditors(AssetRecord? record)
     {
+        _licensePresetCoordinator?.Dispose();
+        _licensePresetCoordinator = null;
         DetailFields.Clear();
+        LicenseConditionFields.Clear();
         if (record is null && !_isDraft)
         {
             return;
@@ -427,15 +466,29 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
         foreach (var definition in _definitions.Values
                      .Where(definition => definition.DetailVisible)
-                     .OrderBy(definition => definition.Id == BuiltInFieldIds.TargetPath ? 0 : 1))
+                     .OrderBy(definition => definition.Id == BuiltInFieldIds.Favorite
+                         ? 0
+                         : definition.Id == BuiltInFieldIds.TargetPath ? 1 : 2))
         {
             var searchField = SearchFields.FirstOrDefault(field => field.Definition.Id == definition.Id);
             var options = searchField?.Options.Select(option => new SelectableOptionViewModel(option.Id, option.Label));
-            DetailFields.Add(new FieldEditorViewModel(
+            var editor = new FieldEditorViewModel(
                 definition,
                 record?.Values.GetValueOrDefault(definition.Id),
-                options));
+                options);
+            DetailFields.Add(editor);
+            if (editor.IsLicenseCondition)
+            {
+                LicenseConditionFields.Add(editor);
+            }
         }
+
+        if (LicenseConditionFields.Count > 0)
+        {
+            LicenseConditionFields[0].ShowLicenseConditionGroup();
+        }
+
+        RebuildLicensePresetCoordinator();
     }
 
     private async Task SaveRecordAsync()
@@ -465,8 +518,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 return;
             }
 
+            var pathCheckSucceeded = await RefreshSavedRecordPathsAsync(saved);
             await ReloadAndSelectAsync(saved.Id);
-            StatusMessage = $"「{CreateRow(saved).Name}」を保存しました。";
+            StatusMessage = pathCheckSucceeded
+                ? $"「{CreateRow(saved).Name}」を保存しました。"
+                : $"「{CreateRow(saved).Name}」を保存しましたが、パス確認に失敗しました。";
         }
         catch (Exception exception)
         {
@@ -637,13 +693,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
-    private void PickTarget(bool isFolder)
+    private void PickTarget()
     {
         try
         {
-            var path = isFolder
-                ? _runtime.PathRegistration.PickTargetFolder()
-                : _runtime.PathRegistration.PickTargetFile();
+            var path = _runtime.PathRegistration.PickTarget();
             if (path is null)
             {
                 return;
@@ -660,14 +714,57 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void PickFieldPath(FieldEditorViewModel editor)
+    {
+        try
+        {
+            var registration = editor.IsFolderPath
+                ? _runtime.PathRegistration.PickAuxiliaryFolder($"{editor.Label}を選択")
+                : _runtime.PathRegistration.PickAuxiliaryFile($"{editor.Label}を選択");
+            if (registration is not null)
+            {
+                editor.Text = registration.Path;
+            }
+        }
+        catch (Exception exception)
+        {
+            _dialogs.ShowError($"パスを選択できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
+        }
+    }
+
+    private void PickListPath(FieldEditorEntryViewModel entry)
+    {
+        try
+        {
+            var registration = _runtime.PathRegistration.PickAuxiliaryFile("関連文書を選択");
+            if (registration is not null)
+            {
+                entry.SecondaryText = registration.Path;
+            }
+        }
+        catch (Exception exception)
+        {
+            _dialogs.ShowError($"関連文書を選択できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
+        }
+    }
+
+    private void OpenFieldUrl(FieldEditorViewModel editor)
+    {
+        TryShellAction(
+            () => _runtime.Shell.OpenWebUrl(editor.Text.Trim()),
+            "URLを開けませんでした。");
+    }
+
+    private void OpenListUrl(FieldEditorEntryViewModel entry)
+    {
+        TryShellAction(
+            () => _runtime.Shell.OpenWebUrl(entry.SecondaryText.Trim()),
+            "URLを開けませんでした。");
+    }
+
     private void ApplyFileSelectionDefaults(TargetPathFieldValue path)
     {
-        if (path.Kind != TargetPathKind.File)
-        {
-            return;
-        }
-
-        var defaults = FileSelectionDefaultProvider.Create(path.Path, _assetTypes);
+        var defaults = FileSelectionDefaultProvider.Create(path.Path, path.Kind, _assetTypes);
         var nameEditor = DetailFields.Single(field => field.Definition.Id == BuiltInFieldIds.Name);
         if (string.IsNullOrWhiteSpace(nameEditor.Text))
         {
@@ -711,7 +808,21 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void ShowTargetInExplorer(RecordRowViewModel row)
+    {
+        if (row.Record.TargetPath is { } target)
+        {
+            var kind = target.Kind == TargetPathKind.File ? PathEntryKind.File : PathEntryKind.Folder;
+            TryShellAction(() => _runtime.Shell.ShowInExplorer(target.Path, kind));
+        }
+    }
+
     private void TryShellAction(Action action)
+    {
+        TryShellAction(action, "Windowsでパスを開けませんでした。");
+    }
+
+    private void TryShellAction(Action action, string errorMessage)
     {
         try
         {
@@ -719,22 +830,63 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            _dialogs.ShowError($"Windowsでパスを開けませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
+            _dialogs.ShowError($"{errorMessage}{Environment.NewLine}{exception.Message}", exception: exception);
         }
     }
 
     private async Task ShowManagementAsync()
     {
+        var selectedRecordId = SelectedRecord?.Record.Id;
+        var wasDraft = _isDraft;
         _runtime.ShowManagementWindow();
         try
         {
             await ReloadSnapshotAsync();
-            SelectedRecord = null;
             ApplySearch();
+            if (selectedRecordId is { } id)
+            {
+                SelectedRecord = Records.FirstOrDefault(row => row.Record.Id == id);
+            }
+            else if (wasDraft)
+            {
+                RefreshDetailFieldOptions();
+            }
+            else
+            {
+                SelectedRecord = null;
+            }
         }
         catch (Exception exception)
         {
             _dialogs.ShowError($"管理画面の変更を再読み込みできませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
+        }
+    }
+
+    private void RefreshDetailFieldOptions()
+    {
+        foreach (var editor in DetailFields)
+        {
+            var searchField = SearchFields.FirstOrDefault(field => field.Definition.Id == editor.Definition.Id);
+            var options = searchField?.Options.Select(
+                option => new SelectableOptionViewModel(option.Id, option.Label)) ?? [];
+            editor.ReplaceOptions(options);
+        }
+
+        RebuildLicensePresetCoordinator();
+    }
+
+    private void RebuildLicensePresetCoordinator()
+    {
+        _licensePresetCoordinator?.Dispose();
+        _licensePresetCoordinator = null;
+        var presetEditor = DetailFields.FirstOrDefault(
+            editor => editor.Definition.Id == BuiltInFieldIds.LicensePreset);
+        if (presetEditor is not null)
+        {
+            _licensePresetCoordinator = new LicensePresetInputCoordinator(
+                presetEditor,
+                LicenseConditionFields,
+                _licensePresets);
         }
     }
 
@@ -814,6 +966,20 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         SelectedRecord = Records.FirstOrDefault(row => row.Record.Id == id);
         _isDraft = false;
         OnPropertyChanged(nameof(EditorTitle));
+    }
+
+    private async Task<bool> RefreshSavedRecordPathsAsync(AssetRecord record)
+    {
+        try
+        {
+            _ = await _runtime.PathChecks.CheckRecordAsync(record);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            await _runtime.Logger.LogErrorAsync("レコード保存後のパス確認", exception);
+            return false;
+        }
     }
 
     private async Task CheckAllPathsAsync(bool refreshCachedResults)

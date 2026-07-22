@@ -1,4 +1,5 @@
 using AssetManager.Application.Data;
+using AssetManager.Domain.Records;
 
 namespace AssetManager.Application.Paths;
 
@@ -36,5 +37,16 @@ public sealed class RecordPathCheckCoordinator
         CancellationToken cancellationToken = default)
     {
         return _pathChecks.CheckChangedPathAsync(path, cancellationToken);
+    }
+
+    public Task<PathCheckBatchResult> CheckRecordAsync(
+        AssetRecord record,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        return _pathChecks.CheckAllAsync(
+            PathReferenceExtractor.Extract([record]),
+            refreshCachedResults: true,
+            cancellationToken: cancellationToken);
     }
 }

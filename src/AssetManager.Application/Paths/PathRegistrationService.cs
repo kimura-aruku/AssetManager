@@ -65,11 +65,32 @@ public sealed class PathRegistrationService
         return path is null ? null : RegisterTarget(path);
     }
 
+    public TargetPathFieldValue? PickTarget(string title = "対象ファイルまたはフォルダーを選択")
+    {
+        EnsurePicker();
+        var path = _picker!.PickFileOrFolder(title);
+        return path is null ? null : RegisterTarget(path);
+    }
+
     public TargetPathFieldValue? PickTargetFolder(string title = "対象フォルダーを選択")
     {
         EnsurePicker();
         var path = _picker!.PickFolder(title);
         return path is null ? null : RegisterTarget(path);
+    }
+
+    public AuxiliaryPathRegistration? PickAuxiliaryFile(string title)
+    {
+        EnsurePicker();
+        var path = _picker!.PickFile(title);
+        return path is null ? null : RegisterAuxiliary(path, PathEntryKind.File);
+    }
+
+    public AuxiliaryPathRegistration? PickAuxiliaryFolder(string title)
+    {
+        EnsurePicker();
+        var path = _picker!.PickFolder(title);
+        return path is null ? null : RegisterAuxiliary(path, PathEntryKind.Folder);
     }
 
     private string ValidateLocalFixedPath(string input)

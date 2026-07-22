@@ -96,15 +96,25 @@ public static class DomainModelValidator
         var canonicalDefinitions = BuiltInFieldCatalog.All.ToDictionary(definition => definition.Id);
         foreach (var definition in copied.Where(definition => definition.Origin == FieldOrigin.BuiltIn))
         {
-            if (!canonicalDefinitions.TryGetValue(definition.Id, out var canonical)
-                || definition.Label != canonical.Label
-                || definition.Type != canonical.Type
-                || definition.SystemRole != canonical.SystemRole
-                || definition.MainTableRequired != canonical.MainTableRequired
-                || definition.UserCanHide != canonical.UserCanHide
-                || definition.UserCanRename != canonical.UserCanRename
-                || definition.UserCanChangeType != canonical.UserCanChangeType
-                || definition.UserCanDelete != canonical.UserCanDelete)
+            if (!canonicalDefinitions.TryGetValue(definition.Id, out var canonical))
+            {
+                if (IsLegacyNotesDefinition(definition)
+                    || IsLegacyLicenseConditionDefinition(definition))
+                {
+                    continue;
+                }
+
+                issues.Add(new ValidationIssue(
+                    ValidationIssueCode.InvalidBuiltInFieldDefinition,
+                    $"標準カラム'{definition.Id}'の固定定義が変更されています。",
+                    definition.Id));
+                continue;
+            }
+
+            if (!HasCanonicalFixedDefinition(definition, canonical)
+                && !IsLegacyAcquisitionSourceDefinition(definition, canonical)
+                && !IsLegacyDescriptionDefinition(definition, canonical)
+                && !IsLegacyLicenseConditionDefinition(definition))
             {
                 issues.Add(new ValidationIssue(
                     ValidationIssueCode.InvalidBuiltInFieldDefinition,
@@ -114,6 +124,88 @@ public static class DomainModelValidator
         }
 
         return issues;
+    }
+
+    private static bool IsLegacyDescriptionDefinition(
+        FieldDefinition definition,
+        FieldDefinition canonical)
+    {
+        return definition.Id == BuiltInFieldIds.Description
+            && definition.Label == "説明"
+            && canonical.Label == "詳細"
+            && definition.Type == canonical.Type
+            && definition.SystemRole == canonical.SystemRole
+            && definition.MainTableRequired == canonical.MainTableRequired
+            && definition.UserCanHide == canonical.UserCanHide
+            && definition.UserCanRename == canonical.UserCanRename
+            && definition.UserCanChangeType == canonical.UserCanChangeType
+            && definition.UserCanDelete == canonical.UserCanDelete;
+    }
+
+    private static bool IsLegacyNotesDefinition(FieldDefinition definition)
+    {
+        return definition.Id == BuiltInFieldIds.Notes
+            && definition.Label == "備考"
+            && definition.Type == FieldType.MultilineText
+            && definition.SystemRole == SystemRole.Notes
+            && !definition.MainTableRequired
+            && !definition.UserCanRename
+            && !definition.UserCanChangeType
+            && !definition.UserCanDelete;
+    }
+
+    private static bool IsLegacyLicenseConditionDefinition(FieldDefinition definition)
+    {
+        var expected = definition.Id switch
+        {
+            var id when id == BuiltInFieldIds.CreditDisplayRequired => ("クレジット必須", SystemRole.CreditRequired),
+            var id when id == BuiltInFieldIds.LinkRequired => ("リンク必須", SystemRole.LinkRequired),
+            var id when id == BuiltInFieldIds.LogoRequired => ("ロゴ必須", SystemRole.LogoRequired),
+            var id when id == BuiltInFieldIds.OriginalDataRedistributionAllowed => ("再配布可", SystemRole.RedistributionAllowed),
+            var id when id == BuiltInFieldIds.AdultUseAllowed => ("成人向け利用可", SystemRole.AdultUseAllowed),
+            var id when id == BuiltInFieldIds.GenerativeAiInputAllowed => ("生成AI利用可", SystemRole.GenerativeAiUseAllowed),
+            var id when id == BuiltInFieldIds.LicenseUnknown => ("条件不明", SystemRole.LicenseUnknown),
+            var id when id == BuiltInFieldIds.LicenseReviewRequired => ("要再確認", SystemRole.LicenseNeedsReview),
+            _ => default,
+        };
+        return expected != default
+            && definition.Label == expected.Item1
+            && definition.SystemRole == expected.Item2
+            && definition.Type == FieldType.Boolean
+            && !definition.MainTableRequired
+            && !definition.UserCanRename
+            && !definition.UserCanChangeType
+            && !definition.UserCanDelete;
+    }
+
+    private static bool HasCanonicalFixedDefinition(
+        FieldDefinition definition,
+        FieldDefinition canonical)
+    {
+        return definition.Label == canonical.Label
+            && definition.Type == canonical.Type
+            && definition.SystemRole == canonical.SystemRole
+            && definition.MainTableRequired == canonical.MainTableRequired
+            && definition.UserCanHide == canonical.UserCanHide
+            && definition.UserCanRename == canonical.UserCanRename
+            && definition.UserCanChangeType == canonical.UserCanChangeType
+            && definition.UserCanDelete == canonical.UserCanDelete;
+    }
+
+    private static bool IsLegacyAcquisitionSourceDefinition(
+        FieldDefinition definition,
+        FieldDefinition canonical)
+    {
+        return definition.Id == BuiltInFieldIds.AcquisitionSource
+            && definition.Type == FieldType.Text
+            && canonical.Type == FieldType.SingleSelect
+            && definition.Label == canonical.Label
+            && definition.SystemRole == canonical.SystemRole
+            && definition.MainTableRequired == canonical.MainTableRequired
+            && definition.UserCanHide == canonical.UserCanHide
+            && definition.UserCanRename == canonical.UserCanRename
+            && definition.UserCanChangeType == canonical.UserCanChangeType
+            && definition.UserCanDelete == canonical.UserCanDelete;
     }
 
     public static AssetRecordValidationResult ValidateRecord(

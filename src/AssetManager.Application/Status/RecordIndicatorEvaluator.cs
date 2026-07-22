@@ -1,4 +1,5 @@
 using AssetManager.Application.Paths;
+using AssetManager.Domain.Fields;
 using AssetManager.Domain.Licensing;
 using AssetManager.Domain.Records;
 using AssetManager.Domain.Values;
@@ -7,24 +8,29 @@ namespace AssetManager.Application.Status;
 
 public enum LicenseBadgeKind
 {
-    CreditRequired,
-    LinkRequired,
-    LogoRequired,
     CommercialUseAllowed,
     ModificationAllowed,
-    RedistributionAllowed,
-    AdultUseAllowed,
-    GenerativeAiUseAllowed,
+    ProductEmbeddingAllowed,
+    OriginalDataRedistributionAllowed,
+    CreditDisplayRequired,
+    CopyrightNoticeRetentionRequired,
+    LicenseTextAttachmentRequired,
+    SameLicenseRequired,
+    AiTrainingAllowed,
+    GenerativeAiInputAllowed,
+    EngineRestrictionExists,
+    LicenseReviewRequired,
 }
 
 public sealed record LicenseBadge(
     LicenseBadgeKind Kind,
     string Glyph,
     string Name,
+    string Summary,
     string Description,
     bool IsRequired)
 {
-    public string ToolTip => $"{Name}: {Description}";
+    public string ToolTip => Description;
 }
 
 public enum RecordIndicatorKind
@@ -35,7 +41,6 @@ public enum RecordIndicatorKind
     PathError,
     TargetPathMissing,
     LicenseReviewOverdue,
-    LicenseConditionsUnknown,
     LicenseNeedsReview,
     PathChecking,
     PathUnchecked,
@@ -66,22 +71,42 @@ public static class LicenseBadgeEvaluator
     {
         ArgumentNullException.ThrowIfNull(terms);
         var badges = new List<LicenseBadge>();
-        Add(terms.CreditRequired, LicenseBadgeKind.CreditRequired, "©", "クレジット必須", "利用時にクレジット表記が必要です。", true);
-        Add(terms.LinkRequired, LicenseBadgeKind.LinkRequired, "🔗", "リンク必須", "利用時に指定リンクの掲載が必要です。", true);
-        Add(terms.LogoRequired, LicenseBadgeKind.LogoRequired, "▣", "ロゴ必須", "利用時に指定ロゴの掲載が必要です。", true);
-        Add(terms.CommercialUseAllowed, LicenseBadgeKind.CommercialUseAllowed, "商", "商用利用可", "商用目的で利用できます。", false);
-        Add(terms.ModificationAllowed, LicenseBadgeKind.ModificationAllowed, "改", "改変可", "素材を改変して利用できます。", false);
-        Add(terms.RedistributionAllowed, LicenseBadgeKind.RedistributionAllowed, "再", "再配布可", "条件の範囲内で再配布できます。", false);
-        Add(terms.AdultUseAllowed, LicenseBadgeKind.AdultUseAllowed, "R18", "成人向け利用可", "成人向けコンテンツで利用できます。", false);
-        Add(terms.GenerativeAiUseAllowed, LicenseBadgeKind.GenerativeAiUseAllowed, "AI", "生成AI利用可", "生成AI関連の用途で利用できます。", false);
+        foreach (var condition in LicenseConditionCatalog.All)
+        {
+            if (!terms.GetValue(condition.SystemRole))
+            {
+                continue;
+            }
+
+            badges.Add(new LicenseBadge(
+                MapKind(condition.SystemRole),
+                condition.Glyph,
+                condition.Label,
+                condition.Summary,
+                condition.Description,
+                condition.IsRequired));
+        }
+
         return badges;
 
-        void Add(bool enabled, LicenseBadgeKind kind, string glyph, string name, string description, bool required)
+        static LicenseBadgeKind MapKind(SystemRole role)
         {
-            if (enabled)
+            return role switch
             {
-                badges.Add(new LicenseBadge(kind, glyph, name, description, required));
-            }
+                SystemRole.CommercialUseAllowed => LicenseBadgeKind.CommercialUseAllowed,
+                SystemRole.ModificationAllowed => LicenseBadgeKind.ModificationAllowed,
+                SystemRole.ProductEmbeddingAllowed => LicenseBadgeKind.ProductEmbeddingAllowed,
+                SystemRole.OriginalDataRedistributionAllowed => LicenseBadgeKind.OriginalDataRedistributionAllowed,
+                SystemRole.CreditDisplayRequired => LicenseBadgeKind.CreditDisplayRequired,
+                SystemRole.CopyrightNoticeRetentionRequired => LicenseBadgeKind.CopyrightNoticeRetentionRequired,
+                SystemRole.LicenseTextAttachmentRequired => LicenseBadgeKind.LicenseTextAttachmentRequired,
+                SystemRole.SameLicenseRequired => LicenseBadgeKind.SameLicenseRequired,
+                SystemRole.AiTrainingAllowed => LicenseBadgeKind.AiTrainingAllowed,
+                SystemRole.GenerativeAiInputAllowed => LicenseBadgeKind.GenerativeAiInputAllowed,
+                SystemRole.EngineRestrictionExists => LicenseBadgeKind.EngineRestrictionExists,
+                SystemRole.LicenseReviewRequired => LicenseBadgeKind.LicenseReviewRequired,
+                _ => throw new ArgumentOutOfRangeException(nameof(role), role, null),
+            };
         }
     }
 }
@@ -157,16 +182,11 @@ public static class RecordIndicatorEvaluator
                 RecordIndicatorSeverity.Warning,
                 "⏱",
                 "最終確認日超過"),
-            LicenseWarningKind.ConditionsUnknown => Create(
-                RecordIndicatorKind.LicenseConditionsUnknown,
-                RecordIndicatorSeverity.Warning,
-                "?",
-                "条件不明"),
             LicenseWarningKind.NeedsReview => Create(
                 RecordIndicatorKind.LicenseNeedsReview,
                 RecordIndicatorSeverity.Warning,
                 "!",
-                "要再確認"),
+                "再確認必要"),
             _ => throw new ArgumentOutOfRangeException(nameof(warning)),
         };
 

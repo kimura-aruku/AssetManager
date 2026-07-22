@@ -1,4 +1,6 @@
 using AssetManager.Application.Startup;
+using AssetManager.Application.Catalog;
+using AssetManager.Application.Fields;
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
@@ -9,6 +11,7 @@ using AssetManager.Infrastructure.Persistence.Models;
 using AssetManager.Infrastructure.Persistence.Recovery;
 using AssetManager.Infrastructure.Persistence.Repositories;
 using AssetManager.Infrastructure.Persistence.Transactions;
+using AssetManager.Infrastructure.Operations;
 
 namespace AssetManager.Infrastructure.Startup;
 
@@ -79,6 +82,20 @@ public sealed class DataSetInitializer : IStartupInitializer
 
             Report(progress, "管理データを読み込んでいます。", 7);
             var snapshot = await loader.LoadAsync(layout, cancellationToken).ConfigureAwait(false);
+            var dataStore = new JsonAssetManagerDataStore(layout, _store);
+            if (await new StandardFieldMigrationService(dataStore)
+                    .MigrateAsync(cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                snapshot = await loader.LoadAsync(layout, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (await new AcquisitionSourceMigrationService(dataStore)
+                    .MigrateAsync(cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                snapshot = await loader.LoadAsync(layout, cancellationToken).ConfigureAwait(false);
+            }
 
             return new StartupResult(
                 layout.RootDirectory,
@@ -137,6 +154,14 @@ public sealed class DataSetInitializer : IStartupInitializer
             created = true;
         }
 
+        if (!File.Exists(layout.LicensePresetsFile))
+        {
+            await new LicensePresetRepository(_store)
+                .SaveAsync(layout, [], cancellationToken)
+                .ConfigureAwait(false);
+            created = true;
+        }
+
         if (!File.Exists(layout.TagsFile))
         {
             await new TagRepository(_store)
@@ -181,6 +206,7 @@ public sealed class DataSetInitializer : IStartupInitializer
             new ManifestRepository(_store),
             new FieldDefinitionRepository(_store),
             new AssetTypeRepository(_store),
+            new LicensePresetRepository(_store),
             new TagRepository(_store),
             new SettingsRepository(_store),
             new ViewSettingsRepository(_store),

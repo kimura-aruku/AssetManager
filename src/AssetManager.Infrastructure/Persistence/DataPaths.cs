@@ -50,6 +50,7 @@ public sealed class DataRootLayout
         DefinitionsDirectory = Path.Combine(RootDirectory, "definitions");
         FieldsFile = Path.Combine(DefinitionsDirectory, "fields.json");
         AssetTypesFile = Path.Combine(DefinitionsDirectory, "asset-types.json");
+        LicensePresetsFile = Path.Combine(DefinitionsDirectory, "license-presets.json");
         TagsFile = Path.Combine(DefinitionsDirectory, "tags.json");
         SettingsFile = Path.Combine(RootDirectory, "settings.json");
         ViewsFile = Path.Combine(RootDirectory, "views.json");
@@ -68,6 +69,8 @@ public sealed class DataRootLayout
     public string FieldsFile { get; }
 
     public string AssetTypesFile { get; }
+
+    public string LicensePresetsFile { get; }
 
     public string TagsFile { get; }
 

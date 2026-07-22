@@ -2,6 +2,7 @@ using System.Text.Json;
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
+using AssetManager.Domain.Licensing;
 using AssetManager.Domain.Validation;
 using AssetManager.Infrastructure.Persistence.Json;
 using AssetManager.Infrastructure.Persistence.Models;
@@ -172,6 +173,127 @@ public sealed class AssetTypeRepository(AtomicJsonFileStore store)
             new AssetTypeId(document.Id),
             document.Name,
             document.Extensions);
+    }
+}
+
+public sealed class LicensePresetRepository(AtomicJsonFileStore store)
+{
+    public static void ValidateFieldOptions(
+        IEnumerable<FieldDefinition> fieldDefinitions,
+        IEnumerable<LicensePresetDefinition> licensePresets)
+    {
+        var definition = fieldDefinitions.FirstOrDefault(
+            field => field.Id == BuiltInFieldIds.LicensePreset);
+        if (definition is null)
+        {
+            return;
+        }
+
+        var presets = licensePresets.ToDictionary(preset => preset.Id.Value, StringComparer.Ordinal);
+        var matches = definition.Options.Count == presets.Count
+            && definition.Options.All(option => presets.TryGetValue(option.Id.Value, out var preset)
+                && string.Equals(option.Label, preset.Name, StringComparison.Ordinal));
+        if (!matches)
+        {
+            throw new DataPersistenceException("定型ライセンスマスタとカラム選択肢が一致していません。");
+        }
+    }
+
+    public async Task<IReadOnlyList<LicensePresetDefinition>> LoadAsync(
+        DataRootLayout layout,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var document = await store.ReadAsync<LicensePresetsDocument>(
+                layout.LicensePresetsFile,
+                ValidateDocument,
+                cancellationToken).ConfigureAwait(false);
+            return document.LicensePresets.Select(ToDomain).ToArray();
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or DataPersistenceException or ArgumentException)
+        {
+            throw new CriticalDataFileException(layout.LicensePresetsFile, exception);
+        }
+    }
+
+    public Task SaveAsync(
+        DataRootLayout layout,
+        IEnumerable<LicensePresetDefinition> licensePresets,
+        CancellationToken cancellationToken = default)
+    {
+        return store.SaveAsync(
+            layout.LicensePresetsFile,
+            CreateDocument(licensePresets),
+            ValidateDocument,
+            cancellationToken);
+    }
+
+    public static LicensePresetsDocument CreateDocument(
+        IEnumerable<LicensePresetDefinition> licensePresets)
+    {
+        ArgumentNullException.ThrowIfNull(licensePresets);
+        return new LicensePresetsDocument(
+            JsonDefaults.CurrentSchemaVersion,
+            licensePresets.Select(ToDocument).ToArray());
+    }
+
+    private static void ValidateDocument(LicensePresetsDocument document)
+    {
+        SchemaVersionGuard.EnsureCurrent(document.SchemaVersion);
+        var presets = document.LicensePresets.Select(ToDomain).ToArray();
+        if (presets.Select(preset => preset.Id).Distinct().Count() != presets.Length)
+        {
+            throw new DataPersistenceException("定型ライセンスIDが重複しています。");
+        }
+
+        if (presets.Select(preset => preset.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() != presets.Length)
+        {
+            throw new DataPersistenceException("定型ライセンス名が重複しています。");
+        }
+    }
+
+    private static LicensePresetDefinition ToDomain(LicensePresetDocument document)
+    {
+        return new LicensePresetDefinition(
+            new LicensePresetId(document.Id),
+            document.Name,
+            new LicenseTerms(
+                document.Terms.CommercialUseAllowed,
+                document.Terms.ModificationAllowed,
+                document.Terms.ProductEmbeddingAllowed,
+                document.Terms.OriginalDataRedistributionAllowed
+                    || document.Terms.RedistributionAllowed is true,
+                document.Terms.CreditDisplayRequired
+                    || document.Terms.CreditRequired is true,
+                document.Terms.CopyrightNoticeRetentionRequired,
+                document.Terms.LicenseTextAttachmentRequired,
+                document.Terms.SameLicenseRequired,
+                document.Terms.AiTrainingAllowed,
+                document.Terms.GenerativeAiInputAllowed
+                    || document.Terms.GenerativeAiUseAllowed is true,
+                document.Terms.EngineRestrictionExists,
+                document.Terms.NeedsReview));
+    }
+
+    private static LicensePresetDocument ToDocument(LicensePresetDefinition preset)
+    {
+        return new LicensePresetDocument(
+            preset.Id.Value,
+            preset.Name,
+            new LicenseTermsDocument(
+                preset.Terms.CommercialUseAllowed,
+                preset.Terms.ModificationAllowed,
+                preset.Terms.ProductEmbeddingAllowed,
+                preset.Terms.OriginalDataRedistributionAllowed,
+                preset.Terms.CreditDisplayRequired,
+                preset.Terms.CopyrightNoticeRetentionRequired,
+                preset.Terms.LicenseTextAttachmentRequired,
+                preset.Terms.SameLicenseRequired,
+                preset.Terms.AiTrainingAllowed,
+                preset.Terms.GenerativeAiInputAllowed,
+                preset.Terms.EngineRestrictionExists,
+                preset.Terms.NeedsReview));
     }
 }
 

@@ -36,6 +36,18 @@ public readonly record struct TagCategoryId
     public override string ToString() => Value;
 }
 
+public readonly record struct LicensePresetId
+{
+    public LicensePresetId(string value)
+    {
+        Value = IdentifierValidation.EnsurePrefixedValue(value, "license-preset.", nameof(value));
+    }
+
+    public string Value { get; }
+
+    public override string ToString() => Value;
+}
+
 public readonly record struct SelectionOptionId
 {
     public SelectionOptionId(string value)

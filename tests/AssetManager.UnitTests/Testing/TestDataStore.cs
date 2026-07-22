@@ -4,6 +4,7 @@ using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
 using AssetManager.Domain.Records;
+using AssetManager.Domain.Licensing;
 
 namespace AssetManager.UnitTests.Testing;
 
@@ -67,6 +68,17 @@ internal sealed class TestDataStore(AssetManagerDataSnapshot snapshot) : IAssetM
         CancellationToken cancellationToken = default)
     {
         Snapshot = Snapshot with { AssetTypes = assetTypes };
+        return Task.CompletedTask;
+    }
+
+    public Task SaveLicensePresetsAsync(
+        IReadOnlyList<LicensePresetDefinition> licensePresets,
+        IReadOnlyList<FieldDefinition> fieldDefinitions,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Snapshot = Snapshot with { FieldDefinitions = fieldDefinitions };
+        Snapshot = Snapshot with { LicensePresets = licensePresets };
         return Task.CompletedTask;
     }
 

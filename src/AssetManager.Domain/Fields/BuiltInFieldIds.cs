@@ -10,7 +10,9 @@ public static class BuiltInFieldIds
     public static readonly FieldId Tags = new("builtin.tags");
     public static readonly FieldId Status = new("builtin.status");
     public static readonly FieldId Favorite = new("builtin.favorite");
+    public static readonly FieldId Overview = new("builtin.overview");
     public static readonly FieldId Description = new("builtin.description");
+    // 既存データを「詳細」へ移行するために旧IDを保持する。標準カタログには含めない。
     public static readonly FieldId Notes = new("builtin.notes");
     public static readonly FieldId CurrentVersion = new("builtin.currentVersion");
     public static readonly FieldId AssetUpdatedDate = new("builtin.assetUpdatedDate");
@@ -23,16 +25,23 @@ public static class BuiltInFieldIds
     public static readonly FieldId OrderNumber = new("builtin.orderNumber");
     public static readonly FieldId ReceiptPath = new("builtin.receiptPath");
     public static readonly FieldId PurchaseAccount = new("builtin.purchaseAccount");
-    public static readonly FieldId CreditRequired = new("builtin.creditRequired");
+    public static readonly FieldId LicensePreset = new("builtin.licensePreset");
+    public static readonly FieldId CreditDisplayRequired = new("builtin.creditRequired");
     public static readonly FieldId LinkRequired = new("builtin.linkRequired");
     public static readonly FieldId LogoRequired = new("builtin.logoRequired");
     public static readonly FieldId CommercialUseAllowed = new("builtin.commercialUseAllowed");
     public static readonly FieldId ModificationAllowed = new("builtin.modificationAllowed");
-    public static readonly FieldId RedistributionAllowed = new("builtin.redistributionAllowed");
+    public static readonly FieldId ProductEmbeddingAllowed = new("builtin.productEmbeddingAllowed");
+    public static readonly FieldId OriginalDataRedistributionAllowed = new("builtin.redistributionAllowed");
+    public static readonly FieldId CopyrightNoticeRetentionRequired = new("builtin.copyrightNoticeRetentionRequired");
+    public static readonly FieldId LicenseTextAttachmentRequired = new("builtin.licenseTextAttachmentRequired");
+    public static readonly FieldId SameLicenseRequired = new("builtin.sameLicenseRequired");
+    public static readonly FieldId AiTrainingAllowed = new("builtin.aiTrainingAllowed");
     public static readonly FieldId AdultUseAllowed = new("builtin.adultUseAllowed");
-    public static readonly FieldId GenerativeAiUseAllowed = new("builtin.generativeAiUseAllowed");
+    public static readonly FieldId GenerativeAiInputAllowed = new("builtin.generativeAiUseAllowed");
+    public static readonly FieldId EngineRestrictionExists = new("builtin.engineRestrictionExists");
     public static readonly FieldId LicenseUnknown = new("builtin.licenseUnknown");
-    public static readonly FieldId LicenseNeedsReview = new("builtin.licenseNeedsReview");
+    public static readonly FieldId LicenseReviewRequired = new("builtin.licenseNeedsReview");
     public static readonly FieldId CreditText = new("builtin.creditText");
     public static readonly FieldId LicenseNotes = new("builtin.licenseNotes");
     public static readonly FieldId LicenseFilePath = new("builtin.licenseFilePath");

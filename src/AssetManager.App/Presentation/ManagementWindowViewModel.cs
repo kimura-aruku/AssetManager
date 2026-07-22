@@ -6,6 +6,7 @@ using AssetManager.Application.Fields;
 using AssetManager.Domain.Catalog;
 using AssetManager.Domain.Fields;
 using AssetManager.Domain.Identifiers;
+using AssetManager.Domain.Licensing;
 
 namespace AssetManager.App.Presentation;
 
@@ -17,6 +18,8 @@ public sealed class ManagementWindowViewModel : ObservableObject
     private readonly IUserDialogService _dialogs;
     private FieldDefinition? _selectedField;
     private AssetTypeDefinition? _selectedAssetType;
+    private SelectionOption? _selectedAcquisitionSource;
+    private LicensePresetDefinition? _selectedLicensePreset;
     private TagCategoryDefinition? _selectedCategory;
     private TagDefinition? _selectedTag;
     private string _fieldName = string.Empty;
@@ -26,6 +29,8 @@ public sealed class ManagementWindowViewModel : ObservableObject
     private bool _fieldDetailVisible = true;
     private string _assetTypeName = string.Empty;
     private string _assetTypeExtensions = string.Empty;
+    private string _acquisitionSourceName = string.Empty;
+    private string _licensePresetName = string.Empty;
     private string _categoryName = string.Empty;
     private string _tagName = string.Empty;
     private string _tagColor = "#4F7CAC";
@@ -48,6 +53,20 @@ public sealed class ManagementWindowViewModel : ObservableObject
         SaveAssetTypeCommand = new AsyncRelayCommand(SaveAssetTypeAsync, () => !string.IsNullOrWhiteSpace(AssetTypeName));
         NewAssetTypeCommand = new RelayCommand(ClearAssetTypeForm);
         DeleteAssetTypeCommand = new AsyncRelayCommand(DeleteAssetTypeAsync, () => SelectedAssetType is not null);
+        SaveAcquisitionSourceCommand = new AsyncRelayCommand(
+            SaveAcquisitionSourceAsync,
+            () => !string.IsNullOrWhiteSpace(AcquisitionSourceName));
+        NewAcquisitionSourceCommand = new RelayCommand(ClearAcquisitionSourceForm);
+        DeleteAcquisitionSourceCommand = new AsyncRelayCommand(
+            DeleteAcquisitionSourceAsync,
+            () => SelectedAcquisitionSource is not null);
+        SaveLicensePresetCommand = new AsyncRelayCommand(
+            SaveLicensePresetAsync,
+            () => !string.IsNullOrWhiteSpace(LicensePresetName));
+        NewLicensePresetCommand = new RelayCommand(ClearLicensePresetForm);
+        DeleteLicensePresetCommand = new AsyncRelayCommand(
+            DeleteLicensePresetAsync,
+            () => SelectedLicensePreset is not null);
         SaveCategoryCommand = new AsyncRelayCommand(SaveCategoryAsync, () => !string.IsNullOrWhiteSpace(CategoryName));
         NewCategoryCommand = new RelayCommand(ClearCategoryForm);
         DeleteCategoryCommand = new AsyncRelayCommand(DeleteCategoryAsync, () => SelectedCategory is not null);
@@ -60,6 +79,13 @@ public sealed class ManagementWindowViewModel : ObservableObject
     public ObservableCollection<FieldDefinition> CustomFields { get; } = [];
 
     public ObservableCollection<AssetTypeDefinition> AssetTypes { get; } = [];
+
+    public ObservableCollection<SelectionOption> AcquisitionSources { get; } = [];
+
+    public ObservableCollection<LicensePresetDefinition> LicensePresets { get; } = [];
+
+    public ObservableCollection<LicensePresetConditionViewModel> LicensePresetConditions { get; } =
+        new(LicenseConditionCatalog.All.Select(condition => new LicensePresetConditionViewModel(condition)));
 
     public ObservableCollection<TagCategoryDefinition> Categories { get; } = [];
 
@@ -105,6 +131,33 @@ public sealed class ManagementWindowViewModel : ObservableObject
             {
                 AssetTypeName = value.Name;
                 AssetTypeExtensions = string.Join(", ", value.Extensions);
+                RelayCommand.RefreshCanExecute();
+            }
+        }
+    }
+
+    public SelectionOption? SelectedAcquisitionSource
+    {
+        get => _selectedAcquisitionSource;
+        set
+        {
+            if (SetProperty(ref _selectedAcquisitionSource, value) && value is not null)
+            {
+                AcquisitionSourceName = value.Label;
+                RelayCommand.RefreshCanExecute();
+            }
+        }
+    }
+
+    public LicensePresetDefinition? SelectedLicensePreset
+    {
+        get => _selectedLicensePreset;
+        set
+        {
+            if (SetProperty(ref _selectedLicensePreset, value) && value is not null)
+            {
+                LicensePresetName = value.Name;
+                ApplyPresetTerms(value.Terms);
                 RelayCommand.RefreshCanExecute();
             }
         }
@@ -180,6 +233,18 @@ public sealed class ManagementWindowViewModel : ObservableObject
         set => SetProperty(ref _assetTypeExtensions, value);
     }
 
+    public string AcquisitionSourceName
+    {
+        get => _acquisitionSourceName;
+        set { if (SetProperty(ref _acquisitionSourceName, value)) RelayCommand.RefreshCanExecute(); }
+    }
+
+    public string LicensePresetName
+    {
+        get => _licensePresetName;
+        set { if (SetProperty(ref _licensePresetName, value)) RelayCommand.RefreshCanExecute(); }
+    }
+
     public string CategoryName
     {
         get => _categoryName;
@@ -210,6 +275,12 @@ public sealed class ManagementWindowViewModel : ObservableObject
     public ICommand SaveAssetTypeCommand { get; }
     public ICommand NewAssetTypeCommand { get; }
     public ICommand DeleteAssetTypeCommand { get; }
+    public ICommand SaveAcquisitionSourceCommand { get; }
+    public ICommand NewAcquisitionSourceCommand { get; }
+    public ICommand DeleteAcquisitionSourceCommand { get; }
+    public ICommand SaveLicensePresetCommand { get; }
+    public ICommand NewLicensePresetCommand { get; }
+    public ICommand DeleteLicensePresetCommand { get; }
     public ICommand SaveCategoryCommand { get; }
     public ICommand NewCategoryCommand { get; }
     public ICommand DeleteCategoryCommand { get; }
@@ -234,6 +305,12 @@ public sealed class ManagementWindowViewModel : ObservableObject
         var snapshot = await _store.LoadAsync();
         Replace(CustomFields, snapshot.FieldDefinitions.Where(field => field.Origin == FieldOrigin.Custom));
         Replace(AssetTypes, snapshot.AssetTypes);
+        Replace(
+            AcquisitionSources,
+            snapshot.FieldDefinitions
+                .Single(field => field.Id == BuiltInFieldIds.AcquisitionSource)
+                .Options);
+        Replace(LicensePresets, snapshot.LicensePresets);
         Replace(Categories, snapshot.TagCategories);
         Replace(Tags, snapshot.Tags);
     }
@@ -327,6 +404,98 @@ public sealed class ManagementWindowViewModel : ObservableObject
         catch (Exception exception)
         {
             _dialogs.ShowError($"種類を保存できませんでした。{Environment.NewLine}{exception.Message}", exception: exception);
+        }
+    }
+
+    private async Task SaveAcquisitionSourceAsync()
+    {
+        try
+        {
+            _ = SelectedAcquisitionSource is null
+                ? await _catalog.AddAcquisitionSourceAsync(AcquisitionSourceName)
+                : await _catalog.UpdateAcquisitionSourceAsync(
+                    SelectedAcquisitionSource.Id,
+                    AcquisitionSourceName);
+            await ReloadAsync();
+            ClearAcquisitionSourceForm();
+        }
+        catch (Exception exception)
+        {
+            _dialogs.ShowError(
+                $"購入／入手元を保存できませんでした。{Environment.NewLine}{exception.Message}",
+                exception: exception);
+        }
+    }
+
+    private async Task DeleteAcquisitionSourceAsync()
+    {
+        var selected = SelectedAcquisitionSource;
+        if (selected is null
+            || !_dialogs.Confirm(
+                $"購入／入手元「{selected.Label}」を削除しますか？",
+                "AssetManager - 購入／入手元削除"))
+        {
+            return;
+        }
+
+        try
+        {
+            await _catalog.DeleteAcquisitionSourceAsync(selected.Id);
+            await ReloadAsync();
+            ClearAcquisitionSourceForm();
+        }
+        catch (Exception exception)
+        {
+            _dialogs.ShowError(
+                $"購入／入手元を削除できませんでした。{Environment.NewLine}{exception.Message}",
+                exception: exception);
+        }
+    }
+
+    private async Task SaveLicensePresetAsync()
+    {
+        try
+        {
+            var terms = CreatePresetTerms();
+            _ = SelectedLicensePreset is null
+                ? await _catalog.AddLicensePresetAsync(LicensePresetName, terms)
+                : await _catalog.UpdateLicensePresetAsync(
+                    SelectedLicensePreset.Id,
+                    LicensePresetName,
+                    terms);
+            await ReloadAsync();
+            ClearLicensePresetForm();
+        }
+        catch (Exception exception)
+        {
+            _dialogs.ShowError(
+                $"定型ライセンスを保存できませんでした。{Environment.NewLine}{exception.Message}",
+                exception: exception);
+        }
+    }
+
+    private async Task DeleteLicensePresetAsync()
+    {
+        var selected = SelectedLicensePreset;
+        if (selected is null
+            || !_dialogs.Confirm(
+                $"定型ライセンス「{selected.Name}」を削除しますか？",
+                "AssetManager - 定型ライセンス削除"))
+        {
+            return;
+        }
+
+        try
+        {
+            await _catalog.DeleteLicensePresetAsync(selected.Id);
+            await ReloadAsync();
+            ClearLicensePresetForm();
+        }
+        catch (Exception exception)
+        {
+            _dialogs.ShowError(
+                $"定型ライセンスを削除できませんでした。{Environment.NewLine}{exception.Message}",
+                exception: exception);
         }
     }
 
@@ -458,6 +627,49 @@ public sealed class ManagementWindowViewModel : ObservableObject
         AssetTypeExtensions = string.Empty;
     }
 
+    private void ClearAcquisitionSourceForm()
+    {
+        SelectedAcquisitionSource = null;
+        AcquisitionSourceName = string.Empty;
+    }
+
+    private void ClearLicensePresetForm()
+    {
+        SelectedLicensePreset = null;
+        LicensePresetName = string.Empty;
+        ApplyPresetTerms(new LicenseTerms());
+    }
+
+    private LicenseTerms CreatePresetTerms()
+    {
+        return new LicenseTerms(
+            ReadPresetCondition(SystemRole.CommercialUseAllowed),
+            ReadPresetCondition(SystemRole.ModificationAllowed),
+            ReadPresetCondition(SystemRole.ProductEmbeddingAllowed),
+            ReadPresetCondition(SystemRole.OriginalDataRedistributionAllowed),
+            ReadPresetCondition(SystemRole.CreditDisplayRequired),
+            ReadPresetCondition(SystemRole.CopyrightNoticeRetentionRequired),
+            ReadPresetCondition(SystemRole.LicenseTextAttachmentRequired),
+            ReadPresetCondition(SystemRole.SameLicenseRequired),
+            ReadPresetCondition(SystemRole.AiTrainingAllowed),
+            ReadPresetCondition(SystemRole.GenerativeAiInputAllowed),
+            ReadPresetCondition(SystemRole.EngineRestrictionExists),
+            ReadPresetCondition(SystemRole.LicenseReviewRequired));
+    }
+
+    private void ApplyPresetTerms(LicenseTerms terms)
+    {
+        foreach (var condition in LicensePresetConditions)
+        {
+            condition.IsChecked = terms.GetValue(condition.Definition.SystemRole);
+        }
+    }
+
+    private bool ReadPresetCondition(SystemRole role)
+    {
+        return LicensePresetConditions.Single(condition => condition.Definition.SystemRole == role).IsChecked;
+    }
+
     private void ClearCategoryForm()
     {
         SelectedCategory = null;
@@ -484,5 +696,27 @@ public sealed class ManagementWindowViewModel : ObservableObject
         {
             target.Add(value);
         }
+    }
+}
+
+public sealed class LicensePresetConditionViewModel(LicenseConditionDefinition definition) : ObservableObject
+{
+    private bool _isChecked;
+
+    public LicenseConditionDefinition Definition { get; } = definition
+        ?? throw new ArgumentNullException(nameof(definition));
+
+    public string Label => Definition.Label;
+
+    public string Summary => Definition.Summary;
+
+    public string Description => Definition.Description;
+
+    public string ToolTip => Definition.ToolTip;
+
+    public bool IsChecked
+    {
+        get => _isChecked;
+        set => SetProperty(ref _isChecked, value);
     }
 }

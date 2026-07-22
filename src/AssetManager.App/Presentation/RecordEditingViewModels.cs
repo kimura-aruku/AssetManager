@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using System.Windows.Input;
 using AssetManager.Application.Search;
 using AssetManager.Application.Status;
 using AssetManager.Domain.Catalog;
@@ -122,6 +123,30 @@ public sealed class SearchFieldViewModel : ObservableObject
     }
 }
 
+public sealed class FieldEditorEntryViewModel : ObservableObject
+{
+    private string _primaryText;
+    private string _secondaryText;
+
+    public FieldEditorEntryViewModel(string primaryText = "", string secondaryText = "")
+    {
+        _primaryText = primaryText;
+        _secondaryText = secondaryText;
+    }
+
+    public string PrimaryText
+    {
+        get => _primaryText;
+        set => SetProperty(ref _primaryText, value);
+    }
+
+    public string SecondaryText
+    {
+        get => _secondaryText;
+        set => SetProperty(ref _secondaryText, value);
+    }
+}
+
 public sealed class FieldEditorViewModel : ObservableObject
 {
     private string _text = string.Empty;
@@ -130,8 +155,10 @@ public sealed class FieldEditorViewModel : ObservableObject
     private DateTime? _selectedDate;
     private TargetPathKind _targetPathKind = TargetPathKind.File;
     private string? _warning;
+    private bool? _isUrlFormatValid;
     private bool _isDirty;
     private bool _isLoading;
+    private bool _showsLicenseConditionGroup;
 
     public FieldEditorViewModel(
         FieldDefinition definition,
@@ -145,23 +172,52 @@ public sealed class FieldEditorViewModel : ObservableObject
             option.PropertyChanged += OnOptionPropertyChanged;
         }
 
+        AddListEntryCommand = new RelayCommand(AddListEntry, () => IsList);
+        RemoveListEntryCommand = new RelayCommand(RemoveListEntry, () => IsList && Entries.Count > 1);
         Load(value);
+        ValidateUrlInput();
     }
 
     public FieldDefinition Definition { get; }
 
     public string Label => Definition.Id == BuiltInFieldIds.TargetPath ? "パス" : Definition.Label;
 
-    public string? Hint => Definition.Type switch
-    {
-        FieldType.Date => "YYYY/MM/DD",
-        FieldType.StringList => "1行に1件",
-        FieldType.TitledPathList => "1行に『タイトル | パス』",
-        FieldType.TitledUrlList => "1行に『タイトル | URL』",
-        _ => null,
-    };
-
     public ObservableCollection<SelectableOptionViewModel> Options { get; }
+
+    public ObservableCollection<FieldEditorEntryViewModel> Entries { get; } = [];
+
+    public ICommand AddListEntryCommand { get; }
+
+    public ICommand RemoveListEntryCommand { get; }
+
+    public void ReplaceOptions(IEnumerable<SelectableOptionViewModel> options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var selectedIds = Options
+            .Where(option => option.IsSelected)
+            .Select(option => option.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var option in Options)
+        {
+            option.PropertyChanged -= OnOptionPropertyChanged;
+        }
+
+        Options.Clear();
+        foreach (var option in options)
+        {
+            option.IsSelected = selectedIds.Contains(option.Id);
+            option.PropertyChanged += OnOptionPropertyChanged;
+            Options.Add(option);
+        }
+
+        if (IsSingleOption
+            && SelectedOptionId is { } selectedId
+            && Options.All(option => option.Id != selectedId))
+        {
+            SelectedOptionId = null;
+        }
+    }
 
     public bool IsBoolean => Definition.Type == FieldType.Boolean;
 
@@ -171,7 +227,49 @@ public sealed class FieldEditorViewModel : ObservableObject
         or FieldType.AssetTypeSet
         or FieldType.TagSet;
 
+    public bool IsAssetTypeSet => Definition.Type == FieldType.AssetTypeSet;
+
+    public bool IsTagSet => Definition.Type == FieldType.TagSet;
+
+    public bool IsOtherMultiOption => IsMultiOption && !IsAssetTypeSet && !IsTagSet;
+
+    public LicenseConditionDefinition? LicenseCondition => LicenseConditionCatalog.Find(Definition.SystemRole);
+
+    public bool IsLicenseCondition => LicenseCondition is not null;
+
+    public string? LicenseConditionSummary => LicenseCondition?.Summary;
+
+    public string? LicenseConditionDescription => LicenseCondition?.Description;
+
+    public string? LicenseConditionToolTip => LicenseCondition?.ToolTip;
+
+    public bool IsStandaloneBoolean => IsBoolean && !IsLicenseCondition;
+
+    public bool ShowsLicenseConditionGroup => _showsLicenseConditionGroup;
+
+    public bool IsDetailItemVisible => !IsLicenseCondition || ShowsLicenseConditionGroup;
+
     public bool IsTargetPath => Definition.Type == FieldType.TargetPath;
+
+    public bool IsFilePath => Definition.Type == FieldType.FilePath;
+
+    public bool IsFolderPath => Definition.Type == FieldType.FolderPath;
+
+    public bool IsAuxiliaryPath => IsFilePath || IsFolderPath;
+
+    public bool IsUrl => Definition.Type == FieldType.Url;
+
+    public bool IsStringList => Definition.Type == FieldType.StringList;
+
+    public bool IsTitledPathList => Definition.Type == FieldType.TitledPathList;
+
+    public bool IsTitledUrlList => Definition.Type == FieldType.TitledUrlList;
+
+    public bool IsTitledList => IsTitledPathList || IsTitledUrlList;
+
+    public bool IsList => IsStringList || IsTitledList;
+
+    public bool IsNonBoolean => !IsBoolean;
 
     public bool IsDate => Definition.Type == FieldType.Date;
 
@@ -185,12 +283,20 @@ public sealed class FieldEditorViewModel : ObservableObject
         && !IsSingleOption
         && !IsMultiOption
         && !IsDate
-        && !IsNumber;
+        && !IsNumber
+        && !IsList;
 
-    public bool AcceptsMultipleLines => Definition.Type is FieldType.MultilineText
-        or FieldType.StringList
-        or FieldType.TitledPathList
-        or FieldType.TitledUrlList;
+    public bool IsPlainText => IsText && !IsUrl && !IsAuxiliaryPath && !IsTargetPath;
+
+    public bool AcceptsMultipleLines => Definition.Type == FieldType.MultilineText;
+
+    public void ShowLicenseConditionGroup()
+    {
+        if (SetProperty(ref _showsLicenseConditionGroup, true, nameof(ShowsLicenseConditionGroup)))
+        {
+            OnPropertyChanged(nameof(IsDetailItemVisible));
+        }
+    }
 
     public string Text
     {
@@ -200,7 +306,16 @@ public sealed class FieldEditorViewModel : ObservableObject
             if (SetProperty(ref _text, value))
             {
                 MarkDirty();
-                ValidatePreview();
+                if (IsUrl)
+                {
+                    ClearUrlValidation();
+                }
+                else
+                {
+                    ValidatePreview();
+                }
+
+                RelayCommand.RefreshCanExecute();
             }
         }
     }
@@ -259,10 +374,44 @@ public sealed class FieldEditorViewModel : ObservableObject
         private set => SetProperty(ref _warning, value);
     }
 
+    public bool ShowsValidUrlIndicator => _isUrlFormatValid is true;
+
+    public bool ShowsInvalidUrlIndicator => _isUrlFormatValid is false;
+
     public bool IsDirty
     {
         get => _isDirty;
         private set => SetProperty(ref _isDirty, value);
+    }
+
+    public void ValidateUrlInput()
+    {
+        if (!IsUrl && !IsTitledUrlList)
+        {
+            return;
+        }
+
+        Warning = null;
+        var hasInput = IsUrl
+            ? !string.IsNullOrWhiteSpace(Text)
+            : Entries.Any(entry => !string.IsNullOrWhiteSpace(entry.PrimaryText)
+                || !string.IsNullOrWhiteSpace(entry.SecondaryText));
+        if (!hasInput)
+        {
+            SetUrlFormatValidity(null);
+            return;
+        }
+
+        try
+        {
+            _ = CreateValue();
+            SetUrlFormatValidity(true);
+        }
+        catch (Exception exception) when (exception is DomainValidationException or FormatException)
+        {
+            Warning = exception.Message;
+            SetUrlFormatValidity(false);
+        }
     }
 
     public FieldValue? CreateValue()
@@ -308,6 +457,43 @@ public sealed class FieldEditorViewModel : ObservableObject
                 : new DateFieldValue(new AssetDate(DateOnly.FromDateTime(SelectedDate.Value)));
         }
 
+        if (IsStringList)
+        {
+            var values = Entries
+                .Select(entry => entry.PrimaryText.Trim())
+                .Where(value => value.Length > 0)
+                .ToArray();
+            if (values.Length == 0)
+            {
+                return null;
+            }
+
+            return Definition.SystemRole switch
+            {
+                SystemRole.Creators => new CreatorListFieldValue(values),
+                SystemRole.Sellers => new SellerListFieldValue(values),
+                _ => throw new DomainValidationException($"カラム'{Label}'の入力形式に対応していません。"),
+            };
+        }
+
+        if (IsTitledPathList)
+        {
+            var values = CreateTitledEntries();
+            return values.Length == 0
+                ? null
+                : new RelatedDocumentListFieldValue(
+                    values.Select(item => new RelatedDocument(item.Title, item.Value)));
+        }
+
+        if (IsTitledUrlList)
+        {
+            var values = CreateTitledEntries();
+            return values.Length == 0
+                ? null
+                : new RelatedUrlListFieldValue(
+                    values.Select(item => new RelatedUrl(item.Title, item.Value)));
+        }
+
         if (trimmed.Length == 0)
         {
             return null;
@@ -322,14 +508,6 @@ public sealed class FieldEditorViewModel : ObservableObject
             FieldType.FilePath => new FilePathFieldValue(trimmed),
             FieldType.FolderPath => new FolderPathFieldValue(trimmed),
             FieldType.TargetPath => new TargetPathFieldValue(TargetPathKind, trimmed),
-            FieldType.StringList when Definition.SystemRole == SystemRole.Creators =>
-                new CreatorListFieldValue(ParseLines(Text)),
-            FieldType.StringList when Definition.SystemRole == SystemRole.Sellers =>
-                new SellerListFieldValue(ParseLines(Text)),
-            FieldType.TitledPathList => new RelatedDocumentListFieldValue(
-                ParseTitledLines(Text).Select(item => new RelatedDocument(item.Title, item.Value))),
-            FieldType.TitledUrlList => new RelatedUrlListFieldValue(
-                ParseTitledLines(Text).Select(item => new RelatedUrl(item.Title, item.Value))),
             _ => throw new DomainValidationException($"カラム'{Label}'の入力形式に対応していません。"),
         };
     }
@@ -352,6 +530,7 @@ public sealed class FieldEditorViewModel : ObservableObject
                 ? date.Value.Value.ToDateTime(TimeOnly.MinValue)
                 : null;
             TargetPathKind = value is TargetPathFieldValue target ? target.Kind : TargetPathKind.File;
+            LoadListEntries(value);
 
             var selectedIds = value switch
             {
@@ -381,6 +560,101 @@ public sealed class FieldEditorViewModel : ObservableObject
         }
     }
 
+    private void OnEntryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        MarkDirty();
+        if (IsTitledUrlList)
+        {
+            ClearUrlValidation();
+        }
+        else
+        {
+            ValidatePreview();
+        }
+
+        RelayCommand.RefreshCanExecute();
+    }
+
+    private void AddListEntry()
+    {
+        AddListEntryCore(new FieldEditorEntryViewModel());
+        MarkDirty();
+        RelayCommand.RefreshCanExecute();
+    }
+
+    private void RemoveListEntry()
+    {
+        if (Entries.Count <= 1)
+        {
+            return;
+        }
+
+        var entry = Entries[^1];
+        entry.PropertyChanged -= OnEntryPropertyChanged;
+        Entries.RemoveAt(Entries.Count - 1);
+        MarkDirty();
+        if (IsTitledUrlList)
+        {
+            ClearUrlValidation();
+        }
+        else
+        {
+            ValidatePreview();
+        }
+
+        RelayCommand.RefreshCanExecute();
+    }
+
+    private void LoadListEntries(FieldValue? value)
+    {
+        foreach (var entry in Entries)
+        {
+            entry.PropertyChanged -= OnEntryPropertyChanged;
+        }
+
+        Entries.Clear();
+        switch (value)
+        {
+            case CreatorListFieldValue creators:
+                foreach (var creator in creators.Values)
+                {
+                    AddListEntryCore(new FieldEditorEntryViewModel(creator));
+                }
+                break;
+            case SellerListFieldValue sellers:
+                foreach (var seller in sellers.Values)
+                {
+                    AddListEntryCore(new FieldEditorEntryViewModel(seller));
+                }
+                break;
+            case RelatedDocumentListFieldValue documents:
+                foreach (var document in documents.Values)
+                {
+                    AddListEntryCore(new FieldEditorEntryViewModel(document.Title, document.Path));
+                }
+                break;
+            case RelatedUrlListFieldValue urls:
+                foreach (var url in urls.Values)
+                {
+                    AddListEntryCore(new FieldEditorEntryViewModel(url.Title, url.Url));
+                }
+                break;
+        }
+
+        if (IsList && Entries.Count == 0)
+        {
+            AddListEntryCore(new FieldEditorEntryViewModel());
+        }
+
+        RelayCommand.RefreshCanExecute();
+    }
+
+    private void AddListEntryCore(FieldEditorEntryViewModel entry)
+    {
+        entry.PropertyChanged += OnEntryPropertyChanged;
+        Entries.Add(entry);
+    }
+
     private void MarkDirty()
     {
         if (!_isLoading)
@@ -393,7 +667,7 @@ public sealed class FieldEditorViewModel : ObservableObject
     {
         var text = Text.Trim();
         Warning = null;
-        if (text.Length == 0)
+        if (text.Length == 0 && !IsList)
         {
             return;
         }
@@ -409,22 +683,36 @@ public sealed class FieldEditorViewModel : ObservableObject
                 Warning = exception.Message;
             }
         }
-        else if (Definition.Type is FieldType.Url or FieldType.TitledUrlList)
-        {
-            try
-            {
-                _ = CreateValue();
-            }
-            catch (Exception exception) when (exception is DomainValidationException or FormatException)
-            {
-                Warning = exception.Message;
-            }
-        }
         else if (Definition.Type is FieldType.FilePath or FieldType.FolderPath or FieldType.TargetPath
                  && !System.IO.Path.IsPathFullyQualified(text))
         {
             Warning = "ローカルドライブの絶対パスを入力してください。";
         }
+
+        else if (IsTitledPathList
+                 && Entries.Any(entry => !string.IsNullOrWhiteSpace(entry.SecondaryText)
+                     && !System.IO.Path.IsPathFullyQualified(entry.SecondaryText.Trim())))
+        {
+            Warning = "各パスにはローカルドライブの絶対パスを入力してください。";
+        }
+    }
+
+    private void ClearUrlValidation()
+    {
+        Warning = null;
+        SetUrlFormatValidity(null);
+    }
+
+    private void SetUrlFormatValidity(bool? value)
+    {
+        if (_isUrlFormatValid == value)
+        {
+            return;
+        }
+
+        _isUrlFormatValid = value;
+        OnPropertyChanged(nameof(ShowsValidUrlIndicator));
+        OnPropertyChanged(nameof(ShowsInvalidUrlIndicator));
     }
 
     private static decimal ParseNumber(string value)
@@ -438,23 +726,18 @@ public sealed class FieldEditorViewModel : ObservableObject
         throw new DomainValidationException("数値を入力してください。", nameof(value));
     }
 
-    private static string[] ParseLines(string value)
+    private (string Title, string Value)[] CreateTitledEntries()
     {
-        return value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-    }
-
-    private static IEnumerable<(string Title, string Value)> ParseTitledLines(string value)
-    {
-        foreach (var line in ParseLines(value))
+        var entries = Entries
+            .Select(entry => (Title: entry.PrimaryText.Trim(), Value: entry.SecondaryText.Trim()))
+            .Where(entry => entry.Title.Length > 0 || entry.Value.Length > 0)
+            .ToArray();
+        if (entries.Any(entry => entry.Title.Length == 0 || entry.Value.Length == 0))
         {
-            var parts = line.Split('|', 2, StringSplitOptions.TrimEntries);
-            if (parts.Length != 2 || parts.Any(string.IsNullOrWhiteSpace))
-            {
-                throw new DomainValidationException("各行を『タイトル | 値』の形式で入力してください。", nameof(value));
-            }
-
-            yield return (parts[0], parts[1]);
+            throw new DomainValidationException("タイトルと値を両方入力してください。", nameof(Entries));
         }
+
+        return entries;
     }
 }
 
@@ -524,6 +807,10 @@ public sealed class RecordRowViewModel
             ? string.Join(", ", types.Values.Select(id => typeNames.GetValueOrDefault(id, id.Value)))
             : string.Empty;
         TargetPath = record.TargetPath?.Path ?? string.Empty;
+        LicenseLastCheckedDate = record
+            .GetValue<DateFieldValue>(BuiltInFieldIds.LicenseLastCheckedDate)?
+            .Value
+            .ToDisplayString() ?? string.Empty;
         License = CreateLicenseSummary(record);
         LicenseBadges = LicenseBadgeEvaluator.Evaluate(LicenseTerms.FromRecord(record));
         StatusIndicators = RecordIndicatorEvaluator.Evaluate(
@@ -552,6 +839,8 @@ public sealed class RecordRowViewModel
     public string Types { get; }
 
     public string TargetPath { get; }
+
+    public string LicenseLastCheckedDate { get; }
 
     public string License { get; }
 
@@ -583,22 +872,11 @@ public sealed class RecordRowViewModel
 
     private static string CreateLicenseSummary(AssetRecord record)
     {
-        var labels = new List<string>();
-        AddFlag(BuiltInFieldIds.CommercialUseAllowed, "商用○");
-        AddFlag(BuiltInFieldIds.ModificationAllowed, "改変○");
-        AddFlag(BuiltInFieldIds.CreditRequired, "クレジット必須");
-        AddFlag(BuiltInFieldIds.LinkRequired, "リンク必須");
-        AddFlag(BuiltInFieldIds.LicenseUnknown, "条件不明");
-        AddFlag(BuiltInFieldIds.LicenseNeedsReview, "要再確認");
-        return labels.Count == 0 ? "—" : string.Join("  ", labels);
-
-        void AddFlag(FieldId id, string label)
-        {
-            if (record.GetValue<BooleanFieldValue>(id)?.Value == true)
-            {
-                labels.Add(label);
-            }
-        }
+        var labels = LicenseConditionCatalog.All
+            .Where(condition => record.GetValue<BooleanFieldValue>(condition.FieldId)?.Value == true)
+            .Select(condition => condition.Label)
+            .ToArray();
+        return labels.Length == 0 ? "—" : string.Join("  ", labels);
     }
 }
 

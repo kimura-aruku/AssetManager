@@ -4,6 +4,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using AssetManager.App.Presentation;
 using AssetManager.Application.GridEditing;
 using AssetManager.Domain.Identifiers;
@@ -12,6 +13,7 @@ namespace AssetManager.App;
 
 public partial class MainWindow : Window
 {
+    private readonly List<DataGridColumn> _dynamicColumns = [];
     private bool _isNormalizingSelection;
     public MainWindow()
     {
@@ -24,6 +26,7 @@ public partial class MainWindow : Window
         if (DataContext is MainWindowViewModel viewModel)
         {
             viewModel.GridColumnsChanged -= OnGridColumnsChanged;
+            viewModel.DetailScrollToTopRequested -= OnDetailScrollToTopRequested;
         }
 
         (DataContext as IDisposable)?.Dispose();
@@ -35,13 +38,32 @@ public partial class MainWindow : Window
         if (e.OldValue is MainWindowViewModel oldViewModel)
         {
             oldViewModel.GridColumnsChanged -= OnGridColumnsChanged;
+            oldViewModel.DetailScrollToTopRequested -= OnDetailScrollToTopRequested;
         }
 
         if (e.NewValue is MainWindowViewModel newViewModel)
         {
             newViewModel.GridColumnsChanged += OnGridColumnsChanged;
+            newViewModel.DetailScrollToTopRequested += OnDetailScrollToTopRequested;
             RebuildDynamicColumns(newViewModel);
         }
+    }
+
+    private void OnDetailPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        var offset = Math.Clamp(
+            DetailScrollViewer.VerticalOffset - e.Delta,
+            0,
+            DetailScrollViewer.ScrollableHeight);
+        DetailScrollViewer.ScrollToVerticalOffset(offset);
+        e.Handled = true;
+    }
+
+    private void OnDetailScrollToTopRequested(object? sender, EventArgs e)
+    {
+        _ = Dispatcher.InvokeAsync(
+            DetailScrollViewer.ScrollToTop,
+            DispatcherPriority.Loaded);
     }
 
     private void OnGridColumnsChanged(object? sender, EventArgs e)
@@ -54,14 +76,16 @@ public partial class MainWindow : Window
 
     private void RebuildDynamicColumns(MainWindowViewModel viewModel)
     {
-        while (RecordsGrid.Columns.Count > 6)
+        foreach (var column in _dynamicColumns)
         {
-            RecordsGrid.Columns.RemoveAt(RecordsGrid.Columns.Count - 1);
+            _ = RecordsGrid.Columns.Remove(column);
         }
+
+        _dynamicColumns.Clear();
 
         foreach (var option in viewModel.GetVisibleDynamicColumns())
         {
-            RecordsGrid.Columns.Add(new DataGridTextColumn
+            var column = new DataGridTextColumn
             {
                 Header = option.Label,
                 Width = 140,
@@ -70,7 +94,10 @@ public partial class MainWindow : Window
                 {
                     Mode = BindingMode.OneWay,
                 },
-            });
+            };
+            var lastCheckedColumnIndex = RecordsGrid.Columns.IndexOf(LicenseLastCheckedColumn);
+            RecordsGrid.Columns.Insert(lastCheckedColumnIndex, column);
+            _dynamicColumns.Add(column);
         }
     }
 
@@ -153,6 +180,21 @@ public partial class MainWindow : Window
         }
 
         UpdateViewModelSelection();
+    }
+
+    private void OnUrlInputLostFocus(object sender, RoutedEventArgs e)
+    {
+        var current = sender as DependencyObject;
+        while (current is not null)
+        {
+            if (current is FrameworkElement { DataContext: FieldEditorViewModel editor })
+            {
+                editor.ValidateUrlInput();
+                return;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
     }
 
     private void UpdateViewModelSelection()

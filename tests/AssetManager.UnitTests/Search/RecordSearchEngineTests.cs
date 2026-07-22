@@ -83,6 +83,23 @@ public sealed class RecordSearchEngineTests
     }
 
     [Fact]
+    public void AcquisitionSourceUsesMasterOptionIdForFiltering()
+    {
+        var booth = new SelectionOptionId("acquisition-source.booth");
+        var record = Set(
+            AssetRecord.Create(TestTime),
+            BuiltInFieldIds.AcquisitionSource,
+            new SingleSelectionFieldValue(booth));
+
+        Assert.True(RecordSearchEngine.Matches(record, Query(
+            BuiltInFieldIds.AcquisitionSource,
+            new OptionAnyCondition([booth.Value, "acquisition-source.unity"]))));
+        Assert.False(RecordSearchEngine.Matches(record, Query(
+            BuiltInFieldIds.AcquisitionSource,
+            new OptionAnyCondition(["acquisition-source.unity"]))));
+    }
+
+    [Fact]
     public void BooleanConditionTreatsOmittedDefaultAsFalse()
     {
         var omitted = AssetRecord.Create(TestTime);
