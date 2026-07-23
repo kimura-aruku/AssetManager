@@ -32,9 +32,17 @@ public sealed class PathCheckServiceTests
     [Fact]
     public async Task CancelStopsNewChecksAndKeepsCompletedResults()
     {
-        var fileSystem = new TrackingFileSystem(TimeSpan.FromMilliseconds(30));
+        using var cancellation = new CancellationTokenSource();
+        var fileSystem = new TrackingFileSystem(
+            TimeSpan.FromMilliseconds(30),
+            completedChecks =>
+            {
+                if (completedChecks == 1)
+                {
+                    cancellation.Cancel();
+                }
+            });
         var service = new PathCheckService(fileSystem);
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(45));
         var paths = Enumerable.Range(0, 40).Select(index => $@"C:\Assets\{index}.png");
 
         var result = await service.CheckAllAsync(
@@ -115,10 +123,13 @@ public sealed class PathCheckServiceTests
         Assert.Equal(RecordIndicatorKind.PathsAvailable, Assert.Single(indicators).Kind);
     }
 
-    private sealed class TrackingFileSystem(TimeSpan delay) : IWindowsPathFileSystem
+    private sealed class TrackingFileSystem(
+        TimeSpan delay,
+        Action<int>? onCheckCompleted = null) : IWindowsPathFileSystem
     {
         private int _activeChecks;
         private int _checkCount;
+        private int _completedChecks;
         private int _maximumActiveChecks;
 
         public int CheckCount => _checkCount;
@@ -141,6 +152,8 @@ public sealed class PathCheckServiceTests
                     Thread.Sleep(delay);
                 }
 
+                var completedChecks = Interlocked.Increment(ref _completedChecks);
+                onCheckCompleted?.Invoke(completedChecks);
                 return new PathCheckResult(path, PathCheckStatus.Available);
             }
             finally
